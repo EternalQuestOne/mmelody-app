@@ -93,9 +93,11 @@ function App() {
           // 4. Extract Deep Tags and Save to Supabase
           const extractedComposer = tags.TCOM ? tags.TCOM.data : '';
           const extractedLyricist = tags.TEXT ? tags.TEXT.data : '';
+          const extractedSubtitle = tags.TIT3 ? tags.TIT3.data : ''; // <-- Grabbing the Subtitle frame!
 
           const newSong = {
             title: tags.title || file.name.replace('.mp3', ''),
+            subtitle: extractedSubtitle, // <-- Sending it to Supabase!
             artist: tags.artist || '',
             album: tags.album || '',
             genre: tags.genre || '',
