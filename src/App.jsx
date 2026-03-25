@@ -42,7 +42,7 @@ function App() {
   // --- Selection & Sorting State ---
   const [selectedIds, setSelectedIds] = useState([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
-  const [sortOrder, setSortOrder] = useState('newest'); // 'newest', 'oldest', 'az', 'za'
+  const [sortOrder, setSortOrder] = useState('newest'); 
   
   // --- UI State ---
   const [activeTab, setActiveTab] = useState('list') 
@@ -90,33 +90,29 @@ function App() {
 
     try {
       for (const song of songsToDelete) {
-        // 1. Delete Audio (Video type in Cloudinary)
         const audioId = extractPublicId(song.audio_url);
         if (audioId) await fetch('/api/deleteAudio', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ public_id: audioId })});
-
-        // 2. Delete Cover Image
         if (song.cover_url) {
           const coverId = extractPublicId(song.cover_url);
           if (coverId) await fetch('/api/deleteImage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ public_id: coverId })});
         }
-
-        // 3. Delete from Supabase
         await supabase.from('songs').delete().eq('id', song.id);
       }
       setSongs(prev => prev.filter(s => !songsToDelete.find(td => td.id === s.id)));
       setSelectedIds([]);
       setIsSelectionMode(false);
-      if (songsToDelete.find(s => s.id === currentSong?.id)) {
-        handleStop();
-        setCurrentSong(null);
-      }
+      if (songsToDelete.find(s => s.id === currentSong?.id)) { handleStop(); setCurrentSong(null); }
     } catch (err) { console.error("Deletion Error:", err); }
     finally { setIsUploading(false); setUploadProgressText(''); }
   };
 
   // --- Playback Controls ---
+  const handleStop = () => {
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; setIsPlaying(false); setProgress(0); }
+  }
+
   const handlePlayPause = (song) => {
-    if (isSelectionMode) return; // Prevent play when selecting
+    if (isSelectionMode) { toggleSelection(song.id); return; }
     if (!audioRef.current) return;
     if (currentSong && currentSong.audio_url === song.audio_url) {
       if (isPlaying) { audioRef.current.pause(); setIsPlaying(false); }
@@ -163,32 +159,98 @@ function App() {
     (song.artist?.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  // --- Selection Mode Utils ---
   const toggleSelection = (id) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  }
+
+  const navigateTo = (newTab) => {
+    setActiveTab(newTab);
+    if (newTab !== 'playlists') setViewingPlaylist(null);
+  };
+
+  const openPlaylistModal = (e, song) => {
+    if (e) e.stopPropagation();
+    setSongToAddToPlaylist(song);
+    setIsPlaylistModalOpen(true);
+    setActiveMenu(null);
+  }
+
+  const handleGoToDetails = (e, song) => {
+    e.stopPropagation();
+    setCurrentSong(song);
+    navigateTo('detail');
+    setShowMoreDetails(false);
+    setActiveMenu(null);
+  }
+
+  // --- UPLOAD LOGIC ---
+  const handleFileUpload = async (event) => {
+    const files = Array.from(event.target.files);
+    if (files.length === 0) return;
+    setIsUploading(true);
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      setUploadProgressText(`Uploading ${i + 1}/${files.length}...`);
+      await new Promise((resolve) => {
+        const objectURL = URL.createObjectURL(file);
+        const tempAudio = new Audio(objectURL);
+        tempAudio.addEventListener('loadedmetadata', () => {
+          const mins = Math.floor(tempAudio.duration / 60);
+          const secs = Math.floor(tempAudio.duration % 60).toString().padStart(2, '0');
+          const durationStr = `${mins}:${secs}`;
+          URL.revokeObjectURL(objectURL);
+          jsmediatags.read(file, {
+            onSuccess: async function(tag) {
+              try {
+                const tags = tag.tags;
+                let coverUrl = '';
+                if (tags.picture) {
+                  const byteArray = new Uint8Array(tags.picture.data);
+                  const blob = new Blob([byteArray], { type: tags.picture.format });
+                  const imgFormData = new FormData();
+                  imgFormData.append('file', blob); imgFormData.append('upload_preset', 'mmelody_preset');
+                  const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: imgFormData });
+                  coverUrl = (await imgRes.json()).secure_url;
+                }
+                const audioFormData = new FormData();
+                audioFormData.append('file', file); audioFormData.append('upload_preset', 'mmelody_preset');
+                const audioRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/video/upload`, { method: 'POST', body: audioFormData });
+                const audioUrl = (await audioRes.json()).secure_url;
+
+                const { data } = await supabase.from('songs').insert([{
+                  title: tags.title || file.name.replace('.mp3', ''),
+                  artist: tags.artist || '', album: tags.album || '', duration: durationStr,
+                  lyrics: extractTagText(tags.USLT) || '', audio_url: audioUrl, cover_url: coverUrl,
+                  subtitle: extractTagText(tags.TIT3) || '', release_year: tags.year || '',
+                  composer: extractTagText(tags.TCOM) || '', lyricist: extractTagText(tags.TEXT) || '',
+                  genre: tags.genre || '', comment: extractTagText(tags.COMM) || ''
+                }]).select();
+                if (data) setSongs(prev => [data[0], ...prev]);
+              } catch (err) { console.error(err); } finally { resolve(); }
+            },
+            onError: () => resolve()
+          });
+        });
+      });
+    }
+    setIsUploading(false); setUploadProgressText(''); event.target.value = null;
   }
 
   const renderSongRow = (song, index) => {
     const isThisPlaying = currentSong?.id === song.id;
     const isSelected = selectedIds.includes(song.id);
-
     return (
       <div key={song.id || index} className={`list-item ${isThisPlaying ? 'active' : ''} ${isSelected ? 'selected-row' : ''}`}>
         <div className="list-clickable-area" onClick={() => isSelectionMode ? toggleSelection(song.id) : handlePlayPause(song)}>
-          {isSelectionMode ? (
-            <div className={`custom-checkbox ${isSelected ? 'checked' : ''}`}></div>
-          ) : (
-            <div className="drag-handle">=</div>
-          )}
+          {isSelectionMode ? <div className={`custom-checkbox ${isSelected ? 'checked' : ''}`}></div> : <div className="drag-handle">=</div>}
           {song.cover_url ? <img src={song.cover_url} alt="art" className="list-art" /> : <div className="list-art placeholder">🎵</div>}
           <div className="list-info">
             <div className="list-title">{song.title}</div>
             <div className="list-subtitle">
-              {song.artist} {isThisPlaying && <span>• {currentTimeFormatted} / {song.duration}</span>}
+              {song.artist} {isThisPlaying && <span className="list-time-counter"> • {currentTimeFormatted} / {song.duration}</span>}
             </div>
           </div>
         </div>
-        
         {!isSelectionMode && (
           <div className="list-actions">
             <span className="duration-text">{song.duration}</span>
@@ -196,8 +258,10 @@ function App() {
               <button className="menu-btn" onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === song.id ? null : song.id); }}>⋮</button>
               {activeMenu === song.id && (
                 <div className="dropdown-menu">
+                  <div className="dropdown-item" onClick={(e) => handleGoToDetails(e, song)}>📄 Go to Details</div>
                   <div className="dropdown-item" onClick={() => { setQueue(prev => [song, ...prev]); setActiveMenu(null); alert("Play Next set!"); }}>⏭ Play Next</div>
                   <div className="dropdown-item" onClick={() => { setQueue(prev => [...prev, song]); setActiveMenu(null); alert("Added to Queue!"); }}>⏮ Add to Queue</div>
+                  <div className="dropdown-item" onClick={(e) => openPlaylistModal(e, song)}>💽 Add to Playlist</div>
                   <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={() => handleDeleteSongs([song])}>🗑 Delete Song</div>
                 </div>
               )}
@@ -208,61 +272,109 @@ function App() {
     );
   }
 
-  // ... (Keep existing handleFileUpload, getPlaylists, and navigation logic) ...
-  // Note: Standard handleFileUpload remains the same for Cloudinary pushing.
-
   return (
     <div className="app-root" onClick={() => setActiveMenu(null)}>
       <audio ref={audioRef} onEnded={handleNextSong} onTimeUpdate={() => {
-        const cur = audioRef.current.currentTime;
-        const dur = audioRef.current.duration;
-        setProgress((cur / dur) * 100);
-        const m = Math.floor(cur / 60);
-        const s = Math.floor(cur % 60).toString().padStart(2, '0');
+        const cur = audioRef.current.currentTime; const dur = audioRef.current.duration;
+        setProgress((cur / dur) * 100); const m = Math.floor(cur / 60); const s = Math.floor(cur % 60).toString().padStart(2, '0');
         setCurrentTimeFormatted(`${m}:${s}`);
       }} />
 
-      {activeTab === 'list' && (
-        <div className="app-container">
-          <header className="header attractive-header">
-            <div className="brand-header"><h2>mMelody</h2></div>
-            <div className="upload-container">
-              <button className="upload-btn" onClick={() => fileInputRef.current.click()}>{isUploading ? uploadProgressText : 'Upload Music'}</button>
-              <input type="file" multiple ref={fileInputRef} onChange={(e) => {/* existing handleFileUpload logic */}} style={{display: 'none'}} />
+      {/* PLAYLIST MODAL */}
+      {isPlaylistModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsPlaylistModalOpen(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>Add to Playlist</h3>
+            <p className="modal-song-name">Adding: <strong>{songToAddToPlaylist?.title}</strong></p>
+            <div className="new-playlist-input-group">
+              <input type="text" placeholder="New Playlist..." value={newPlaylistName} onChange={(e) => setNewPlaylistName(e.target.value)} className="modal-input" />
+              <button className="modal-create-btn" onClick={async () => {
+                const { data } = await supabase.from('playlists').insert([{ name: newPlaylistName }]).select();
+                if (data) { 
+                  setPlaylists([data[0], ...playlists]); 
+                  await supabase.from('playlist_songs').insert([{ playlist_id: data[0].id, song_id: songToAddToPlaylist.id }]);
+                  setIsPlaylistModalOpen(false); alert("Created & Added!");
+                }
+              }}>Create</button>
             </div>
-
-            {/* Selection & Sorting Toolbar */}
-            <div className="selection-toolbar">
-              <div className="toolbar-left">
-                <button className="action-icon-btn" onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }}>
-                  {isSelectionMode ? 'Cancel' : 'Select'}
-                </button>
-                {isSelectionMode && selectedIds.length > 0 && (
-                  <button className="delete-btn-red" onClick={() => handleDeleteSongs(songs.filter(s => selectedIds.includes(s.id)))}>
-                    Delete ({selectedIds.length})
-                  </button>
-                )}
-              </div>
-              <select className="sort-select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
-                <option value="newest">Newest First</option>
-                <option value="oldest">Oldest First</option>
-                <option value="az">A-Z (Title)</option>
-                <option value="za">Z-A (Title)</option>
-              </select>
+            <div className="modal-playlist-list">
+              {playlists.map(pl => (
+                <div key={pl.id} className="modal-playlist-item" onClick={async () => {
+                  await supabase.from('playlist_songs').insert([{ playlist_id: pl.id, song_id: songToAddToPlaylist.id }]);
+                  setIsPlaylistModalOpen(false); alert("Added!");
+                }}><span>{pl.name}</span></div>
+              ))}
             </div>
-          </header>
-
-          <div className="song-list">
-            {filteredSongs.map((song, i) => renderSongRow(song, i))}
+            <button className="modal-close-btn" onClick={() => setIsPlaylistModalOpen(false)}>Cancel</button>
           </div>
         </div>
       )}
-      
-      {/* Footer Nav */}
+
+      <div className="main-content-area">
+        {activeTab === 'list' && (
+          <div className="app-container">
+            <header className="header attractive-header">
+              <div className="brand-header"><h2>mMelody</h2></div>
+              <div className="upload-container">
+                <button className="upload-btn" onClick={() => fileInputRef.current.click()}>{isUploading ? uploadProgressText : 'Upload Music'}</button>
+                <input type="file" multiple ref={fileInputRef} onChange={handleFileUpload} style={{display: 'none'}} />
+              </div>
+              <div className="selection-toolbar">
+                <button className="action-icon-btn" onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }}>{isSelectionMode ? 'Cancel' : 'Select'}</button>
+                {isSelectionMode && selectedIds.length > 0 && <button className="delete-btn-red" onClick={() => handleDeleteSongs(songs.filter(s => selectedIds.includes(s.id)))}>Delete ({selectedIds.length})</button>}
+                <select className="sort-select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
+                  <option value="newest">Newest</option><option value="oldest">Oldest</option><option value="az">A-Z</option><option value="za">Z-A</option>
+                </select>
+              </div>
+              {showSearch && <input type="text" placeholder="Search..." className="search-bar" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} autoFocus />}
+            </header>
+            <div className="song-list">{filteredSongs.map((song, i) => renderSongRow(song, i))}</div>
+          </div>
+        )}
+
+        {activeTab === 'detail' && currentSong && (
+          <div className="detail-view-container">
+            <button className="back-btn" onClick={() => navigateTo('list')}>←</button>
+            <div className="detail-art-container">{currentSong.cover_url ? <img src={currentSong.cover_url} className="detail-art" /> : <div className="detail-art placeholder-large">🎵</div>}</div>
+            <div className="scrolling-wrapper"><div className="scrolling-text"><span className="scroll-title">{currentSong.title}</span><span className="scroll-artist"> • {currentSong.artist}</span></div></div>
+            <div className="detail-progress-container"><div className="progress-bar-bg"><div className="progress-bar-fill" style={{ width: `${progress}%` }}></div></div><div className="time-row"><span>{currentTimeFormatted}</span><span>{currentSong.duration}</span></div></div>
+            <div className="detail-playback-controls-bar">
+              <button className="pro-ctrl-btn" onClick={handlePreviousSong}>⏮</button>
+              <button className="pro-ctrl-btn master-play-pause-btn" onClick={() => handlePlayPause(currentSong)}>{isPlaying ? '⏸' : '▶'}</button>
+              <button className="pro-ctrl-btn" onClick={handleNextSong}>⏭</button>
+            </div>
+            <button className="more-details-btn" onClick={() => setShowMoreDetails(!showMoreDetails)}>{showMoreDetails ? 'Hide' : 'More Details'}</button>
+            {showMoreDetails && (
+              <div className="more-details-content">
+                <div className="tag-grid">
+                  <div className="tag-item"><span>Artist:</span> {currentSong.artist}</div>
+                  <div className="tag-item"><span>Album:</span> {currentSong.album}</div>
+                </div>
+                {currentSong.lyrics && <div className="lyrics-box"><h4>Lyrics</h4><p>{currentSong.lyrics}</p></div>}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'playlists' && (
+          <div className="app-container">
+            <header className="header"><h2>Your Playlists</h2></header>
+            <div className="playlists-grid">
+              {playlists.map(pl => (
+                <div key={pl.id} className="playlist-card" onClick={() => { setViewingPlaylist(pl); setActiveTab('playlist-detail'); }}>
+                  <div className="playlist-card-art">💽</div><div className="playlist-card-title">{pl.name}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
       <nav className="bottom-footer">
-        <button className={activeTab === 'list' ? 'active-tab footer-btn' : 'footer-btn'} onClick={() => setActiveTab('list')}>List</button>
-        <button className={activeTab === 'detail' ? 'active-tab footer-btn' : 'footer-btn'} onClick={() => setActiveTab('detail')}>Detail</button>
-        <button className={activeTab === 'playlists' ? 'active-tab footer-btn' : 'footer-btn'} onClick={() => setActiveTab('playlists')}>Playlists</button>
+        <button className={`footer-btn ${activeTab === 'list' ? 'active-tab' : ''}`} onClick={() => navigateTo('list')}>List</button>
+        <button className={`footer-btn ${activeTab === 'detail' ? 'active-tab' : ''}`} onClick={() => navigateTo('detail')}>Detail</button>
+        <button className={`footer-btn ${activeTab === 'playlists' ? 'active-tab' : ''}`} onClick={() => navigateTo('playlists')}>Playlists</button>
+        <button className={`footer-btn ${showSearch ? 'active-tab' : ''}`} onClick={() => setShowSearch(!showSearch)}>🔍</button>
       </nav>
     </div>
   )
