@@ -515,7 +515,7 @@ function App() {
                       <div className="tag-item"><span>Genre:</span> {currentSong.genre || 'Unknown'}</div>
                       <div className="tag-item"><span>Comment:</span> {currentSong.comment || 'None'}</div>
                     </div>
-                    {currentSong.lyrics ? (<div className="lyrics-box"><h4>Lyrics</h4><p>{currentSong.lyrics}</p></div>) : (<div className="lyrics-box"><p style={{color: '#888', fontStyle: 'italic'}}>No lyrics embedded in this file.</p></div>)}
+                    {currentSong.lyrics ? (<div className="lyrics-box"><h4>Lyrics</h4><p>{currentSong.lyrics}</p></div>) : (<div className="lyrics-box"><p style={{color: '#888', fontStyle: 'italic'}}>Lyrics not available.</p></div>)}
                   </div>
                 )}
               </div>
