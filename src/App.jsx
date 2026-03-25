@@ -155,24 +155,30 @@ function App() {
   }
 
   const renderSongRow = (song, index) => {
-    const isThisPlaying = currentSong?.id === song.id;
-    const isSelected = selectedIds.includes(song.id);
-    return (
-      <div key={song.id} className={`list-item ${isThisPlaying ? 'active' : ''} ${isSelected ? 'selected-row' : ''}`}>
-        <div className="list-clickable-area" onClick={() => isSelectionMode ? toggleSelection(song.id) : handlePlayPause(song)}>
-          {isSelectionMode ? <div className={`custom-checkbox ${isSelected ? 'checked' : ''}`}></div> : <div className="drag-handle">=</div>}
-          {song.cover_url ? <img src={song.cover_url} alt="art" className="list-art" /> : <div className="list-art placeholder">🎵</div>}
-          <div className="list-info">
-            <div className="list-title">{song.title}</div>
-            <div className="list-subtitle">{song.artist}</div>
-            {isThisPlaying && (
-              <div className="list-playing-status">
-                 <span className="list-time-counter">{elapsedTime} / {song.duration}</span>
-                 <div className="list-progress-bar"><div className="list-progress-fill" style={{ width: `${progress}%` }}></div></div>
-              </div>
-            )}
-          </div>
+  const isThisPlaying = currentSong?.id === song.id;
+  const isSelected = selectedIds.includes(song.id);
+
+  return (
+    <div key={song.id} className={`list-item ${isThisPlaying ? 'active' : ''}`}>
+      {/* TOP STORY: Art and Text */}
+      <div className="list-top-row" onClick={() => isSelectionMode ? toggleSelection(song.id) : handlePlayPause(song)}>
+        {isSelectionMode ? (
+          <div className={`custom-checkbox ${isSelected ? 'checked' : ''}`}></div>
+        ) : (
+          <div className="drag-handle">=</div>
+        )}
+        
+        {song.cover_url ? (
+          <img src={song.cover_url} alt="art" className="list-art" />
+        ) : (
+          <div className="list-art placeholder">🎵</div>
+        )}
+
+        <div className="list-info">
+          <div className="list-title">{song.title}</div>
+          <div className="list-subtitle">{song.artist}</div>
         </div>
+
         {!isSelectionMode && (
           <div className="list-actions">
             {isThisPlaying && (
@@ -181,22 +187,34 @@ function App() {
               </button>
             )}
             <span className="duration-text">{song.duration}</span>
-            <div className="menu-container">
-              <button className="menu-btn" onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === song.id ? null : song.id); }}>⋮</button>
-              {activeMenu === song.id && (
-                <div className="dropdown-menu">
-                  <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setCurrentSong(song); navigateTo('detail'); }}>📄 Go to Details</div>
-                  <div className="dropdown-item" onClick={() => { setQueue(prev => [song, ...prev]); setActiveMenu(null); }}>⏭ Play Next</div>
-                  <div className="dropdown-item" onClick={() => { setQueue(prev => [...prev, song]); setActiveMenu(null); }}>⏮ Add to Queue</div>
-                  <div className="dropdown-item" onClick={() => { setSongToAddToPlaylist(song); setIsPlaylistModalOpen(true); }}>💽 Add to Playlist</div>
-                </div>
-              )}
-            </div>
+            <button className="menu-btn" onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === song.id ? null : song.id); }}>⋮</button>
           </div>
         )}
       </div>
-    );
-  }
+
+      {/* BOTTOM STORY: Progress (Only shows when playing) */}
+      {isThisPlaying && (
+        <div className="list-playing-status">
+          <span className="list-time-counter">{elapsedTime} / {song.duration}</span>
+          <div className="list-progress-bar">
+            <div className="list-progress-fill" style={{ width: `${progress}%` }}></div>
+          </div>
+        </div>
+      )}
+
+      {/* Dropdown Menu (Renders outside the top-row so it doesn't shift things) */}
+      {!isSelectionMode && activeMenu === song.id && (
+        <div className="dropdown-menu">
+          <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setCurrentSong(song); navigateTo('detail'); }}>📄 Go to Details</div>
+          <div className="dropdown-item" onClick={() => { setQueue(prev => [song, ...prev]); setActiveMenu(null); }}>⏭ Play Next</div>
+          <div className="dropdown-item" onClick={() => { setQueue(prev => [...prev, song]); setActiveMenu(null); }}>⏮ Add to Queue</div>
+          <div className="dropdown-item" onClick={() => { setSongToAddToPlaylist(song); setIsPlaylistModalOpen(true); }}>💽 Add to Playlist</div>
+          <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={() => handleDeleteSongs([song])}>🗑 Delete</div>
+        </div>
+      )}
+    </div>
+  );
+}
 
   return (
     <div className="app-root" onClick={() => setActiveMenu(null)}>

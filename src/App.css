@@ -10,17 +10,74 @@ body { margin: 0; padding: 0; background-color: #050505; color: #fff; font-famil
 .upload-btn { background: #2F80ED; color: #fff; border: none; padding: 8px 20px; border-radius: 30px; font-weight: 600; cursor: pointer; display: block; margin: 10px auto; }
 
 /* --- LIST VIEW --- */
-.list-item { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-.list-item.active .list-title, .list-item.active .list-subtitle { color: #56CCF2; }
-.list-art { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; }
-.list-info { margin-left: 12px; flex: 1; display: flex; flex-direction: column; }
-.list-title { font-size: 0.85rem; font-weight: 700; }
-.list-subtitle { font-size: 0.8rem; color: #a0a0a0; }
+/* --- FIX: Solid Row Alignment --- */
+.list-item {
+  display: flex;
+  flex-direction: column; /* Stack text above progress */
+  padding: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: transparent;
+}
 
-.list-playing-status { display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 4px; }
-.list-time-counter { font-size: 0.75rem; color: #56CCF2; }
-.list-progress-bar { flex: 1; height: 3px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
-.list-progress-fill { background: #56CCF2; height: 100%; }
+.list-top-row {
+  display: flex;
+  align-items: center; /* Keeps Art, Title, and 3-dots centered vertically */
+  width: 100%;
+}
+
+.list-info {
+  margin-left: 12px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden; /* Prevents text from pushing the 3-dots off screen */
+}
+
+.list-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.list-subtitle {
+  font-size: 0.8rem;
+  color: #a0a0a0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- THE 3RD STORY (PROGRESS) --- */
+.list-playing-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 8px;
+  padding-left: 52px; /* Lines up the progress bar under the TEXT, not the art */
+}
+
+.list-time-counter {
+  font-size: 0.75rem;
+  color: #56CCF2;
+  white-space: nowrap;
+}
+
+.list-progress-bar {
+  flex: 1;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.list-progress-fill {
+  background: #56CCF2;
+  height: 100%;
+}
 
 /* --- DETAIL VIEW (THE FIXES) --- */
 .detail-view-container { padding: 20px; text-align: center; }
