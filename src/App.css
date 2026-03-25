@@ -9,6 +9,8 @@ body {
   justify-content: center;
 }
 
+.app-root { width: 100%; display: flex; justify-content: center; }
+
 .app-container, .detail-view-container {
   width: 100%;
   max-width: 500px;
@@ -18,7 +20,7 @@ body {
   position: relative;
 }
 
-/* --- 7. Attractive Header --- */
+/* --- Header & Upload --- */
 .attractive-header {
   padding: 25px 20px;
   position: sticky;
@@ -55,12 +57,7 @@ body {
   letter-spacing: -0.5px;
 }
 
-/* --- 1. Bulk Upload Button --- */
-.upload-container {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 15px;
-}
+.upload-container { display: flex; justify-content: center; margin-bottom: 15px; }
 
 .upload-btn {
   background-color: #1db954;
@@ -71,21 +68,10 @@ body {
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
-  box-shadow: 0 4px 15px rgba(29, 185, 84, 0.3);
 }
+.upload-btn:hover:not(:disabled) { transform: scale(1.02); }
+.upload-btn:disabled { background-color: #333; color: #888; }
 
-.upload-btn:hover:not(:disabled) {
-  background-color: #1ed760;
-  transform: scale(1.02);
-}
-
-.upload-btn:disabled {
-  background-color: #333;
-  color: #888;
-  box-shadow: none;
-}
-
-/* --- Search Bar --- */
 .search-bar {
   width: 100%;
   padding: 12px 18px;
@@ -96,15 +82,11 @@ body {
   font-size: 1rem;
   box-sizing: border-box;
   outline: none;
-  transition: border-color 0.3s;
 }
-
-.search-bar:focus {
-  border-color: #1db954;
-}
+.search-bar:focus { border-color: #1db954; }
 
 /* --- List View --- */
-.song-list { display: flex; flex-direction: column; }
+.song-list { display: flex; flex-direction: column; padding-bottom: 50px; }
 
 .list-item {
   display: flex;
@@ -113,9 +95,8 @@ body {
   cursor: pointer;
   border-bottom: 1px solid rgba(255,255,255,0.05);
   transition: background-color 0.2s;
-  user-select: none; /* Prevents text highlighting on long press */
+  user-select: none;
 }
-
 .list-item:hover { background-color: rgba(255,255,255,0.03); }
 .list-item.active { background-color: rgba(29, 185, 84, 0.08); }
 .list-item.active .list-title { color: #1db954; }
@@ -134,18 +115,10 @@ body {
   justify-content: center;
 }
 
-.list-info {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  margin-right: 10px;
-}
-
+.list-info { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; margin-right: 10px; }
 .list-title { font-size: 1.05rem; margin-bottom: 4px; font-weight: 500; }
 .list-subtitle { color: #999; font-size: 0.85rem; }
 
-/* --- 5. Progress Bar in List --- */
 .list-progress-bar {
   width: 100%;
   height: 3px;
@@ -154,62 +127,23 @@ body {
   margin-top: 6px;
   overflow: hidden;
 }
+.list-progress-fill { height: 100%; background-color: #1db954; }
 
-.list-progress-fill {
-  height: 100%;
-  background-color: #1db954;
-  transition: width 0.1s linear;
-}
+.list-actions { display: flex; align-items: center; gap: 12px; }
+.list-stop-btn { background: transparent; border: none; color: #aaa; padding: 5px; }
+.list-status { width: 40px; text-align: right; display: flex; justify-content: flex-end; }
+.duration-text { color: #666; font-size: 0.85rem; font-weight: 500; }
+.playing-icon { animation: pulse 1.5s infinite alternate; }
 
-/* --- 2, 3, 4. Actions: Stop, Duration, Speaker --- */
-.list-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
+@keyframes pulse { 0% { opacity: 0.6; } 100% { opacity: 1; } }
 
-.list-stop-btn {
-  background: transparent;
-  border: none;
-  color: #aaa;
-  cursor: pointer;
-  padding: 5px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.2s;
-}
-
-.list-stop-btn:hover { color: #fff; }
-
-.list-status {
-  width: 40px;
-  text-align: right;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.duration-text {
-  color: #666;
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
-.playing-icon {
-  animation: pulse 1.5s infinite alternate;
-}
-
-@keyframes pulse {
-  0% { opacity: 0.6; }
-  100% { opacity: 1; }
-}
-
-/* --- 6. Detail (Hold) View --- */
+/* --- Detail View --- */
 .detail-view-container {
   padding: 30px 20px;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, #1a1a1a 0%, #000000 100%);
+  background: linear-gradient(180deg, #181818 0%, #000000 100%);
+  min-height: 100vh;
 }
 
 .back-btn {
@@ -217,10 +151,12 @@ body {
   border: none;
   color: #aaa;
   font-size: 1rem;
-  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 10px 0;
   cursor: pointer;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
 }
 
 .detail-art-container {
@@ -231,66 +167,89 @@ body {
   border-radius: 12px;
   overflow: hidden;
 }
-
-.detail-art {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
+.detail-art { width: 100%; height: 100%; object-fit: cover; }
 .placeholder-large { font-size: 5rem; background-color: #222; }
 
 .detail-info { text-align: left; margin-bottom: 30px; }
-.detail-info h2 { margin: 0 0 8px 0; font-size: 1.8rem; }
-.detail-info p { margin: 0; color: #aaa; font-size: 1.1rem; }
+.detail-info h2 { margin: 0 0 4px 0; font-size: 1.8rem; color: #fff; }
+.detail-subtitle { margin: 0 0 8px 0; font-size: 1.1rem; color: #1db954; font-weight: 500; }
+.detail-artist { margin: 0; color: #aaa; font-size: 1.1rem; }
 
-.detail-progress-container { margin-bottom: 30px; }
+.detail-progress-container { margin-bottom: 40px; }
+.progress-bar-bg { width: 100%; height: 5px; background: rgba(255,255,255,0.1); border-radius: 3px; margin-bottom: 8px; }
+.progress-bar-fill { height: 100%; background: #ffffff; border-radius: 3px; }
+.time-row { display: flex; justify-content: space-between; color: #888; font-size: 0.85rem; }
 
-.progress-bar-bg {
-  width: 100%;
-  height: 5px;
-  background: rgba(255,255,255,0.1);
-  border-radius: 3px;
-  margin-bottom: 8px;
-}
-
-.progress-bar-fill {
-  height: 100%;
-  background: #ffffff;
-  border-radius: 3px;
-}
-
-.time-row {
-  display: flex;
-  justify-content: space-between;
-  color: #888;
-  font-size: 0.85rem;
-}
-
+/* --- Pro Play Controls --- */
 .detail-controls {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 30px;
+  gap: 40px;
+  margin-bottom: 40px;
 }
 
-.ctrl-btn {
-  background: transparent;
+.pro-ctrl-btn {
   border: none;
-  color: #fff;
-  font-size: 2rem;
   cursor: pointer;
-}
-
-.main-play {
-  width: 70px;
-  height: 70px;
-  background: #fff;
-  color: #000;
-  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2.5rem;
-  padding-left: 5px; /* Visual center for play button */
+  border-radius: 50%;
+  transition: transform 0.2s, background-color 0.2s;
 }
+.pro-ctrl-btn:active { transform: scale(0.95); }
+
+.play-pause-btn {
+  width: 72px;
+  height: 72px;
+  background-color: #1db954;
+  color: #000;
+  box-shadow: 0 8px 24px rgba(29, 185, 84, 0.3);
+}
+.play-pause-btn:hover { background-color: #1ed760; transform: scale(1.04); }
+
+.stop-btn {
+  width: 50px;
+  height: 50px;
+  background-color: rgba(255,255,255,0.1);
+  color: #fff;
+}
+.stop-btn:hover { background-color: rgba(255,255,255,0.2); }
+
+/* --- More Details Section --- */
+.more-details-wrapper { margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; }
+
+.more-details-btn {
+  width: 100%;
+  background-color: transparent;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #fff;
+  padding: 12px;
+  border-radius: 20px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.more-details-btn:hover { background-color: rgba(255,255,255,0.05); }
+
+.more-details-content { margin-top: 20px; animation: fadeIn 0.3s ease; }
+
+.tag-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-bottom: 25px;
+}
+.tag-item { font-size: 0.9rem; color: #ddd; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; }
+.tag-item span { color: #888; display: block; font-size: 0.8rem; margin-bottom: 2px; }
+
+.lyrics-box {
+  background: rgba(255,255,255,0.05);
+  padding: 20px;
+  border-radius: 12px;
+}
+.lyrics-box h4 { margin: 0 0 15px 0; color: #1db954; }
+.lyrics-box p { white-space: pre-wrap; color: #ddd; line-height: 1.6; font-size: 0.95rem; margin: 0; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
