@@ -254,4 +254,4 @@ body {
 .playlist-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; transition: transform 0.2s, background 0.2s; }
 .playlist-card:hover { background: rgba(255,255,255,0.06); transform: translateY(-3px); }
 .playlist-card-art { font-size: 3rem; margin-bottom: 15px; opacity: 0.8; }
-.playlist-card-title { color: #fff; font-weight: 600; font-size: 1.1rem; }
+.playlist-card-title { color: #fff; font-weight: 500; font-size: 0.9rem; margin-top: 5px; }
