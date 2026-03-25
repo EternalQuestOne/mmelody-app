@@ -40,8 +40,6 @@ function App() {
     getSongs()
   }, [])
 
-  // NOTE: The auto-play useEffect has been completely removed to fix the mobile browser block!
-
   async function getSongs() {
     const { data } = await supabase.from('songs').select('*').order('created_at', { ascending: false })
     if (data) setSongs(data)
@@ -70,7 +68,7 @@ function App() {
     }
   }
 
-  // --- GUARANTEED INSTANT TAP-TO-PLAY ---
+  // --- THE BULLETPROOF PLAY MECHANIC ---
   const handlePlayPause = (song) => {
     if (!audioRef.current) return;
 
@@ -79,16 +77,21 @@ function App() {
         audioRef.current.pause()
         setIsPlaying(false)
       } else {
-        audioRef.current.play()
+        audioRef.current.play().catch(e => console.error(e));
         setIsPlaying(true)
       }
     } else {
+      // 1. Update UI instantly
       setCurrentSong(song)
       setIsPlaying(true)
       
-      // FIX: Inject URL directly to bypass mobile browser auto-play blockers!
+      // 2. Control the DOM audio player directly (No React interference)
       audioRef.current.src = song.audio_url;
-      audioRef.current.play().catch(e => console.error("Playback blocked by browser:", e));
+      audioRef.current.load(); // Forces the browser to process the new file
+      audioRef.current.play().catch(e => {
+        console.error("Playback blocked:", e);
+        setIsPlaying(false); // If browser blocks it, revert the play button
+      });
     }
     setActiveMenu(null); 
   }
@@ -185,9 +188,11 @@ function App() {
 
   return (
     <div className="app-root" onClick={() => setActiveMenu(null)}> 
+      {/* CRITICAL FIX: Removed src={...} from here! 
+        React no longer controls this, meaning it won't interrupt loading. 
+      */}
       <audio
         ref={audioRef}
-        src={currentSong ? currentSong.audio_url : ''}
         onEnded={() => setIsPlaying(false)}
         onTimeUpdate={handleTimeUpdate}
       />
