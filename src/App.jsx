@@ -42,6 +42,7 @@ function App() {
 
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
+  const playlistFileInputRef = useRef(null) // NEW: Reference for Playlist Image Upload
   const moreDetailsRef = useRef(null)
 
   useEffect(() => {
@@ -135,7 +136,35 @@ function App() {
     }
   }
 
-  // --- THE FIX: This function now opens the modal everywhere! ---
+  // --- NEW: Upload custom playlist cover image ---
+  const handlePlaylistCoverUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file || !viewingPlaylist) return;
+    setIsUploading(true);
+    setUploadProgressText("Uploading Cover...");
+
+    try {
+      const imgFormData = new FormData();
+      imgFormData.append('file', file);
+      imgFormData.append('upload_preset', 'mmelody_preset');
+      const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: imgFormData });
+      const coverUrl = (await imgRes.json()).secure_url;
+
+      // Save new cover URL to Supabase
+      const { data } = await supabase.from('playlists').update({ cover_url: coverUrl }).eq('id', viewingPlaylist.id).select();
+
+      if (data) {
+        setViewingPlaylist(data[0]); // Update current view
+        setPlaylists(playlists.map(p => p.id === data[0].id ? data[0] : p)); // Update grid
+      }
+    } catch (err) { console.error("Cover upload error:", err); } 
+    finally { 
+      setIsUploading(false); 
+      setUploadProgressText('');
+      event.target.value = null; 
+    }
+  };
+
   const openPlaylistModal = (e, song) => {
     if (e) e.stopPropagation();
     setSongToAddToPlaylist(song);
@@ -307,7 +336,6 @@ function App() {
     (song.artist && song.artist.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
-  // Reusable Component for List Rows (ensures bug-free menus!)
   const renderSongRow = (song, index) => {
     const isThisPlaying = currentSong && currentSong.audio_url === song.audio_url;
     const uniqueId = song.id || index;
@@ -352,10 +380,7 @@ function App() {
                 <div className="dropdown-item" onClick={(e) => handleGoToDetails(e, song)}>📄 Go to Details</div>
                 <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); alert("Added to queue!"); }}>⏮ Add to Queue</div>
                 <div className="dropdown-item" onClick={handleToggleFavorite}>❤️ {currentSong?.id === song.id && currentSong.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div>
-                
-                {/* THE FIX: Opening the Modal from the List! */}
                 <div className="dropdown-item" onClick={(e) => openPlaylistModal(e, song)}>💽 Add to Playlist</div>
-                
               </div>
             )}
           </div>
@@ -376,20 +401,14 @@ function App() {
             <p className="modal-song-name">Adding: <strong>{songToAddToPlaylist?.title}</strong></p>
             
             <div className="new-playlist-input-group">
-              <input 
-                type="text" 
-                placeholder="New Playlist Name..." 
-                value={newPlaylistName} 
-                onChange={(e) => setNewPlaylistName(e.target.value)}
-                className="modal-input"
-              />
+              <input type="text" placeholder="New Playlist Name..." value={newPlaylistName} onChange={(e) => setNewPlaylistName(e.target.value)} className="modal-input" />
               <button className="modal-create-btn" onClick={handleCreateAndAddPlaylist}>Create</button>
             </div>
             
             <div className="modal-playlist-list">
               {playlists.map(pl => (
                 <div key={pl.id} className="modal-playlist-item" onClick={() => handleAddSongToExistingPlaylist(pl.id, pl.name)}>
-                  <div className="modal-pl-icon">💽</div>
+                  <div className="modal-pl-icon">{pl.cover_url ? <img src={pl.cover_url} className="mini-pl-art" alt="art"/> : '💽'}</div>
                   <span>{pl.name}</span>
                 </div>
               ))}
@@ -431,12 +450,9 @@ function App() {
                 <button className="detail-inter-btn" onClick={handleOpenInfo}>
                   <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
                 </button>
-                
-                {/* THE FIX: Opening the Modal from Detail View! */}
                 <button className="detail-inter-btn" onClick={(e) => openPlaylistModal(e, currentSong)}>
                   <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zM2 16h8v-2H2v2zm14-1v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4z"/></svg>
                 </button>
-                
                 <button className="detail-inter-btn menu-container"><button className="menu-btn" onClick={(e) => toggleMenu(e, currentSong.id)}>⋮</button>{activeMenu === currentSong.id && (<div className="dropdown-menu dropdown-upward"><div className="dropdown-item" onClick={handleToggleFavorite}>❤️ {currentSong.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div><div className="dropdown-item" onClick={(e) => openPlaylistModal(e, currentSong)}>💽 Add to Playlist</div></div>)}</button>
               </div>
               
@@ -488,11 +504,26 @@ function App() {
             <header className="header attractive-header" style={{paddingBottom: '20px'}}>
               <div className="header-bg-glow"></div>
               {viewingPlaylist ? (
-                <div style={{display: 'flex', alignItems: 'center'}}>
-                  <button className="back-btn" onClick={() => setViewingPlaylist(null)} style={{padding:0, margin:'0 15px 0 0'}}>
+                <div className="playlist-deep-header">
+                  <button className="back-btn" onClick={() => setViewingPlaylist(null)}>
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                   </button>
+                  
+                  {/* UPGRADED: Clickable Playlist Art */}
+                  <div className="playlist-header-art" onClick={() => playlistFileInputRef.current.click()}>
+                    {isUploading ? (
+                      <div className="pl-upload-spinner">⏳</div>
+                    ) : viewingPlaylist.cover_url ? (
+                      <img src={viewingPlaylist.cover_url} alt="cover" />
+                    ) : (
+                      <div className="pl-placeholder">📷 Tap</div>
+                    )}
+                  </div>
+                  
                   <h2 style={{margin:0, fontSize: '1.5rem', textAlign:'left'}}>{viewingPlaylist.name}</h2>
+                  
+                  {/* Hidden input strictly for playlist images */}
+                  <input type="file" accept="image/*" ref={playlistFileInputRef} onChange={handlePlaylistCoverUpload} style={{ display: 'none' }} />
                 </div>
               ) : (
                 <h2 style={{ fontSize: '1.5rem' }}>Your Playlists</h2>
@@ -509,7 +540,10 @@ function App() {
               <div className="playlists-grid">
                 {playlists.map(pl => (
                   <div key={pl.id} className="playlist-card" onClick={() => handleOpenPlaylist(pl)}>
-                    <div className="playlist-card-art">💽</div>
+                    {/* UPGRADED: Show Image if available, else CD */}
+                    <div className="playlist-card-art">
+                      {pl.cover_url ? <img src={pl.cover_url} alt="playlist art" className="pl-grid-img" /> : '💽'}
+                    </div>
                     <div className="playlist-card-title">{pl.name}</div>
                   </div>
                 ))}
@@ -549,7 +583,6 @@ function App() {
               {showSearch && (<input type="text" placeholder="Search songs or artists..." className="search-bar animate-search" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} autoFocus />)}
             </header>
             
-            {/* THE FIX: Main List now correctly uses the renderSongRow component! */}
             <div className="song-list">
               {filteredSongs.map((song, index) => renderSongRow(song, index))}
             </div>
