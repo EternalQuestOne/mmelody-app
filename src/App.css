@@ -1,71 +1,60 @@
 /* --- GLOBALS --- */
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-body { margin: 0; padding: 0; background-color: #050505; color: #fff; font-family: -apple-system, system-ui, sans-serif; display: flex; justify-content: center; }
-.app-root { width: 100%; max-width: 500px; min-height: 100vh; background-color: #0a0a0a; display: flex; flex-direction: column; position: relative; }
+body { margin: 0; padding: 0; background-color: #050505; color: #fff; font-family: -apple-system, sans-serif; display: flex; justify-content: center; }
+.app-root { width: 100%; max-width: 500px; min-height: 100vh; background-color: #0a0a0a; display: flex; flex-direction: column; }
 .main-content-area { flex: 1; padding-bottom: 80px; overflow-y: auto; }
-.app-container { padding: 15px; }
 
-/* --- HEADER --- */
-.header { position: sticky; top: 0; z-index: 50; background: rgba(10,10,10,0.85); backdrop-filter: blur(10px); padding: 15px 0; }
-.brand-header { display: flex; align-items: center; justify-content: center; margin-bottom: 15px; }
-.brand-header h2 { margin: 0; font-size: 1.8rem; background: linear-gradient(90deg, #B3E5FC, #2F80ED); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 800; }
-.upload-container { display: flex; justify-content: center; margin-bottom: 5px; }
-.upload-btn { background: #2F80ED; color: #fff; border: none; padding: 8px 20px; border-radius: 30px; font-weight: 600; font-size: 0.85rem; cursor: pointer; }
+/* --- BRAND HEADER --- */
+.brand-header { display: flex; justify-content: center; margin-top: 15px; }
+.brand-header h2 { font-size: 1.8rem; background: linear-gradient(90deg, #B3E5FC, #2F80ED); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 800; margin: 0; }
+.upload-btn { background: #2F80ED; color: #fff; border: none; padding: 8px 20px; border-radius: 30px; font-weight: 600; cursor: pointer; display: block; margin: 10px auto; }
 
 /* --- LIST VIEW --- */
-.list-item { display: flex; align-items: center; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.list-item { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
 .list-item.active .list-title, .list-item.active .list-subtitle { color: #56CCF2; }
-.list-clickable-area { display: flex; align-items: center; flex: 1; overflow: hidden; }
-.drag-handle { color: #555; margin-right: 10px; font-size: 1.2rem; }
-.list-art { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
-.list-info { margin-left: 12px; display: flex; flex-direction: column; flex: 1; align-items: flex-start; }
-.list-title { font-size: 0.85rem; font-weight: 700; margin-bottom: 2px; }
+.list-art { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; }
+.list-info { margin-left: 12px; flex: 1; display: flex; flex-direction: column; }
+.list-title { font-size: 0.85rem; font-weight: 700; }
 .list-subtitle { font-size: 0.8rem; color: #a0a0a0; }
 
-/* --- THREE-STORY PLAYING STATUS --- */
 .list-playing-status { display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 4px; }
-.list-time-counter { font-size: 0.75rem; color: #56CCF2; white-space: nowrap; }
+.list-time-counter { font-size: 0.75rem; color: #56CCF2; }
 .list-progress-bar { flex: 1; height: 3px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
 .list-progress-fill { background: #56CCF2; height: 100%; }
 
-.list-actions { display: flex; align-items: center; gap: 8px; }
-.list-stop-btn { background: none; border: none; color: #ff4d4d; padding: 5px; }
-.duration-text { font-size: 0.8rem; color: #777; }
-.menu-btn { background: none; border: none; color: #888; font-size: 1.2rem; cursor: pointer; }
-
-/* --- DETAIL VIEW --- */
-.detail-view-container { padding: 20px; display: flex; flex-direction: column; }
-.detail-art-container { width: 100%; max-width: 280px; margin: 0 auto 20px auto; aspect-ratio: 1/1; border-radius: 12px; overflow: hidden; background: #111; }
+/* --- DETAIL VIEW (THE FIXES) --- */
+.detail-view-container { padding: 20px; text-align: center; }
+.detail-art-container { width: 100%; max-width: 280px; margin: 0 auto 20px; border-radius: 12px; overflow: hidden; background: #111; }
 .detail-art { width: 100%; height: 100%; object-fit: cover; }
+
+.detail-interaction-row { display: flex; justify-content: space-around; margin: 20px 0; }
+.detail-inter-btn { background: none; border: none; color: #fff; padding: 10px; cursor: pointer; }
+/* This removes that white box background */
+.detail-inter-btn svg { background: none; display: block; }
+
+.scrolling-wrapper { overflow: hidden; white-space: nowrap; width: 100%; margin: 15px 0; }
+.scrolling-text { display: inline-block; animation: scroll-text 10s linear infinite; }
+@keyframes scroll-text { 0% { transform: translateX(10%); } 100% { transform: translateX(-100%); } }
+
 .scroll-title { font-size: 1.1rem; font-weight: 700; color: #56CCF2; }
 .scroll-artist { font-size: 1.1rem; color: #a0a0a0; }
 
-.detail-interaction-row { display: flex; justify-content: space-around; margin-bottom: 20px; }
-.detail-inter-btn { background: none; border: none; color: #888; cursor: pointer; }
-.favorite-filled { color: #ff4d4d; }
-
-.detail-progress-container { margin-bottom: 10px; }
-.progress-bar-bg { width: 100%; height: 4px; background: #333; border-radius: 2px; margin-bottom: 10px; }
+.detail-progress-container { margin-bottom: 20px; }
+.progress-bar-bg { width: 100%; height: 4px; background: #333; border-radius: 2px; margin-bottom: 8px; }
 .progress-bar-fill { height: 100%; background: #56CCF2; }
-.detail-playback-controls-bar { display: flex; justify-content: space-around; align-items: center; margin-bottom: 20px; }
+.time-row { display: flex; justify-content: space-between; font-size: 0.8rem; color: #888; }
+
+.detail-playback-controls-bar { display: flex; justify-content: space-around; align-items: center; }
+.pro-ctrl-btn { background: none; border: none; color: #fff; cursor: pointer; }
 .master-play-pause-btn { background: #56CCF2; color: #000; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
 
-/* --- ID3 TAGS & LYRICS --- */
-.tag-grid { display: grid; grid-template-columns: 1fr; gap: 8px; text-align: left; }
-.tag-item span { color: #56CCF2; font-weight: 600; margin-right: 5px; }
-.lyrics-box { border-top: 1px solid #333; padding-top: 15px; margin-top: 10px; }
-.lyrics-box h4 { text-align: center; color: #56CCF2; text-decoration: underline; margin-bottom: 15px; }
-.lyrics-box p { white-space: pre-wrap; line-height: 1.6; color: #ccc; text-align: left; margin: 0; }
-
 /* --- FOOTER --- */
-.bottom-footer { position: fixed; bottom: 0; width: 100%; max-width: 500px; background: rgba(10,10,10,0.95); display: flex; justify-content: space-around; padding: 15px 0 20px 0; border-top: 1px solid rgba(255,255,255,0.05); }
+.bottom-footer { position: fixed; bottom: 0; width: 100%; max-width: 500px; background: rgba(10,10,10,0.95); display: flex; justify-content: space-around; padding: 15px 0 20px; border-top: 1px solid rgba(255,255,255,0.05); z-index: 100; }
 .footer-btn { background: none; border: none; color: #666; cursor: pointer; }
 .footer-btn.active-tab { color: #56CCF2; }
 
-/* --- SELECTION TOOLBAR --- */
-.selection-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 10px; }
-.action-icon-btn { background: rgba(255,255,255,0.1); border: none; color: #56CCF2; padding: 5px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
-.delete-btn-red { background: #ff4d4d; color: #fff; border: none; padding: 5px 12px; border-radius: 15px; font-size: 0.8rem; margin-left: 10px; }
-.sort-select { background: #111; color: #888; border: 1px solid #333; padding: 4px 8px; border-radius: 5px; font-size: 0.75rem; }
-.custom-checkbox { width: 18px; height: 18px; border: 2px solid #555; border-radius: 50%; margin-right: 12px; flex-shrink: 0; }
-.custom-checkbox.checked { background: #56CCF2; border-color: #56CCF2; }
+/* --- MODAL --- */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 200; }
+.modal-content { background: #1a1a1a; width: 90%; max-width: 350px; border-radius: 12px; padding: 20px; }
+.modal-header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+.modal-cancel-btn { background: none; border: none; color: #ff4d4d; font-weight: 600; cursor: pointer; }
