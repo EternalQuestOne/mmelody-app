@@ -15,7 +15,7 @@ const extractTagText = (frame) => {
     if (typeof frame.data.description === 'string') return frame.data.description;
   }
   return '';
-};
+}
 
 function App() {
   const [songs, setSongs] = useState([])
@@ -36,7 +36,6 @@ function App() {
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
 
-  // --- Hardware Back Button Hook ---
   useEffect(() => {
     window.history.replaceState({ tab: 'list' }, '', '');
     const handleHardwareBack = (event) => {
@@ -102,34 +101,28 @@ function App() {
     setActiveMenu(null); 
   }
 
-  // --- NEW Playback Control Logic ---
   const handlePreviousSong = () => {
     if (!songs.length || !currentSong) return;
     const currentIndex = songs.findIndex(s => s.audio_url === currentSong.audio_url);
-    // Descending sort means newer songs are at lower indices.
-    // Finding 'Previous' means finding an *older* song, i.e., index + 1
     if (currentIndex < songs.length - 1) { handlePlayPause(songs[currentIndex + 1]); }
-    else { handlePlayPause(songs[0]); } // wrap to start
+    else { handlePlayPause(songs[0]); }
   }
 
   const handleNextSong = () => {
     if (!songs.length || !currentSong) return;
     const currentIndex = songs.findIndex(s => s.audio_url === currentSong.audio_url);
-    // Finding 'Next' means finding a *newer* song, i.e., index - 1
     if (currentIndex > 0) { handlePlayPause(songs[currentIndex - 1]); }
-    else { handlePlayPause(songs[songs.length - 1]); } // wrap to end
+    else { handlePlayPause(songs[songs.length - 1]); }
   }
 
   const handleSeekBackward = () => { if (audioRef.current) audioRef.current.currentTime -= 10; }
   const handleSeekForward = () => { if (audioRef.current) audioRef.current.currentTime += 10; }
 
-  // --- Other Interaction logic ---
   const handleToggleFavorite = async () => {
     if (!currentSong) return;
     const newFavoriteState = !currentSong.is_favorite;
     const { data } = await supabase.from('songs').update({ is_favorite: newFavoriteState }).eq('id', currentSong.id).select();
     if (data) {
-      // update the local state of this song to prevent re-fetching the entire list
       const updatedSongs = songs.map(s => (s.id === data[0].id ? data[0] : s));
       setSongs(updatedSongs);
       setCurrentSong(data[0]); 
@@ -206,7 +199,7 @@ function App() {
                   lyrics: extractTagText(tags.USLT) || extractTagText(tags.SYLT) || '', 
                   audio_url: audioUrl,
                   cover_url: coverUrl,
-                  is_favorite: false // default on new upload
+                  is_favorite: false 
                 };
 
                 const { data } = await supabase.from('songs').insert([newSong]).select();
@@ -222,7 +215,7 @@ function App() {
     setIsUploading(false);
     setUploadProgressText('');
     event.target.value = null; 
-  };
+  }
 
   const filteredSongs = songs.filter(song =>
     (song.title && song.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -231,16 +224,16 @@ function App() {
 
   return (
     <div className="app-root" onClick={() => setActiveMenu(null)}> 
-      <audio
-        ref={audioRef}
-        onEnded={() => setIsPlaying(false)}
-        onTimeUpdate={handleTimeUpdate}
-      />
+      <audio ref={audioRef} onEnded={() => setIsPlaying(false)} onTimeUpdate={handleTimeUpdate} />
 
       <div className="main-content-area">
         {activeTab === 'detail' && (
           currentSong ? (
             <div className="detail-view-container">
+              <button className="back-btn" onClick={() => navigateTo('list')}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+              </button>
+
               <div className="detail-art-container">
                 {currentSong.cover_url ? (
                   <img src={currentSong.cover_url} alt="cover" className="detail-art" />
@@ -249,16 +242,16 @@ function App() {
                 )}
               </div>
               
-              <div className="detail-info">
-                <h2>{currentSong.title}</h2>
-                {currentSong.subtitle && <h4 className="detail-subtitle">{currentSong.subtitle}</h4>}
-                <p className="detail-artist">{currentSong.artist}</p>
+              {/* --- NEW: SCROLLING MARQUEE --- */}
+              <div className="scrolling-wrapper">
+                <div className="scrolling-text">
+                  <span className="scroll-title">{currentSong.title || 'Unknown Title'}</span>
+                  {currentSong.artist && <span className="scroll-artist"> • {currentSong.artist}</span>}
+                </div>
               </div>
 
-              {/* Interaction row: favorite, info, playlist, more */}
               <div className="detail-interaction-row">
                 <button className={`detail-inter-btn ${currentSong.is_favorite ? 'favorite-filled' : ''}`} onClick={handleToggleFavorite}>
-                  {/* heart icon filled vs outline */}
                   <svg width="28" height="28" viewBox="0 0 24 24" fill={currentSong.is_favorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
                 </button>
                 <button className="detail-inter-btn"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></button>
@@ -276,7 +269,6 @@ function App() {
                 </div>
               </div>
 
-              {/* UPGRADED PROFESSIONAL CONTROLS BAR */}
               <div className="detail-playback-controls-bar">
                 <button className="pro-ctrl-btn" onClick={handleSeekBackward}><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2.5 12a10 10 0 0 1 10-10 10 10 0 0 1 10 10 10 10 0 0 1-10 10 10 10 0 0 1-10-10zm10-8a8 8 0 0 0-8 8 8 8 0 0 0 8 8 8 8 0 0 0 8-8 8 8 0 0 0-8-8zM7 11v2h8v-2H7z"/></svg></button>
                 <button className="pro-ctrl-btn" onClick={handlePreviousSong}><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
@@ -295,7 +287,6 @@ function App() {
                 <button className="more-details-btn" onClick={() => setShowMoreDetails(!showMoreDetails)}>
                   {showMoreDetails ? 'Hide Details' : 'More Details'}
                 </button>
-
                 {showMoreDetails && (
                   <div className="more-details-content">
                     <div className="tag-grid">
@@ -309,26 +300,17 @@ function App() {
                       <div className="tag-item"><span>Genre:</span> {currentSong.genre || 'Unknown'}</div>
                       <div className="tag-item"><span>Comment:</span> {currentSong.comment || 'None'}</div>
                     </div>
-                    
                     {currentSong.lyrics ? (
-                      <div className="lyrics-box">
-                        <h4>Lyrics</h4>
-                        <p>{currentSong.lyrics}</p>
-                      </div>
+                      <div className="lyrics-box"><h4>Lyrics</h4><p>{currentSong.lyrics}</p></div>
                     ) : (
-                      <div className="lyrics-box">
-                        <p style={{color: '#888', fontStyle: 'italic'}}>No lyrics embedded in this file.</p>
-                      </div>
+                      <div className="lyrics-box"><p style={{color: '#888', fontStyle: 'italic'}}>No lyrics embedded in this file.</p></div>
                     )}
                   </div>
                 )}
               </div>
             </div>
           ) : (
-            <div className="empty-state">
-              <h3>No song selected</h3>
-              <p>Play a song from the list view to see details.</p>
-            </div>
+            <div className="empty-state"><h3>No song selected</h3><p>Play a song from the list view to see details.</p></div>
           )
         )}
 
@@ -340,7 +322,7 @@ function App() {
               
               <div className="upload-container">
                 <button className="upload-btn" onClick={() => fileInputRef.current.click()} disabled={isUploading}>
-                  {isUploading ? `⏳ ${uploadProgressText}` : 'Bulk Upload MP3s'}
+                  {isUploading ? `⏳ ${uploadProgressText}` : 'Upload Music'}
                 </button>
                 <input type="file" accept="audio/mpeg, audio/mp3" multiple ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} />
               </div>
@@ -366,13 +348,7 @@ function App() {
                   <div key={uniqueId} className={`list-item ${isThisPlaying ? 'active' : ''}`}>
                     <div className="list-clickable-area" onClick={() => handlePlayPause(song)}>
                       <div className="drag-handle">=</div>
-                      
-                      {song.cover_url ? (
-                        <img src={song.cover_url} alt="cover" className="list-art" />
-                      ) : (
-                        <div className="list-art placeholder">🎵</div>
-                      )}
-                      
+                      {song.cover_url ? (<img src={song.cover_url} alt="cover" className="list-art" />) : (<div className="list-art placeholder">🎵</div>)}
                       <div className="list-info">
                         <div className="list-title">{song.title || 'Unknown Audio'}</div>
                         <div className="list-subtitle">
@@ -384,9 +360,7 @@ function App() {
                           )}
                         </div>
                         {isThisPlaying && (
-                          <div className="list-progress-bar">
-                            <div className="list-progress-fill" style={{ width: `${progress}%` }}></div>
-                          </div>
+                          <div className="list-progress-bar"><div className="list-progress-fill" style={{ width: `${progress}%` }}></div></div>
                         )}
                       </div>
                     </div>
@@ -397,17 +371,10 @@ function App() {
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
                         </button>
                       )}
-                      
                       <div className="list-status">
                         {isThisPlaying && isPlaying ? (
-                          <svg className="playing-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#56CCF2" strokeWidth="2" strokeLinecap="round">
-                            <path d="M11 5L6 9H2v6h4l5 4V5z"></path>
-                            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-                            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
-                          </svg>
-                        ) : (
-                          <span className="duration-text">{song.duration || '--:--'}</span>
-                        )}
+                          <svg className="playing-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#56CCF2" strokeWidth="2" strokeLinecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
+                        ) : (<span className="duration-text">{song.duration || '--:--'}</span>)}
                       </div>
 
                       <div className="menu-container">
@@ -430,35 +397,18 @@ function App() {
         )}
 
         {['queue', 'albums', 'artists', 'playlists'].includes(activeTab) && (
-          <div className="empty-state">
-            <h3>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h3>
-            <p>This architecture is coming soon!</p>
-          </div>
+          <div className="empty-state"><h3>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h3><p>This architecture is coming soon!</p></div>
         )}
       </div>
 
       <nav className="bottom-footer">
-        <button className={`footer-btn ${activeTab === 'list' ? 'active-tab' : ''}`} onClick={() => navigateTo('list')}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
-        </button>
-        <button className={`footer-btn ${activeTab === 'detail' ? 'active-tab' : ''}`} onClick={() => navigateTo('detail')}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
-        </button>
-        <button className={`footer-btn ${activeTab === 'queue' ? 'active-tab' : ''}`} onClick={() => navigateTo('queue')}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-        </button>
-        <button className={`footer-btn ${activeTab === 'albums' ? 'active-tab' : ''}`} onClick={() => navigateTo('albums')}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
-        </button>
-        <button className={`footer-btn ${activeTab === 'artists' ? 'active-tab' : ''}`} onClick={() => navigateTo('artists')}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-        </button>
-        <button className={`footer-btn ${activeTab === 'playlists' ? 'active-tab' : ''}`} onClick={() => navigateTo('playlists')}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
-        </button>
-        <button className={`footer-btn ${showSearch ? 'active-tab' : ''}`} onClick={() => { navigateTo('list'); setShowSearch(!showSearch); }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        </button>
+        <button className={`footer-btn ${activeTab === 'list' ? 'active-tab' : ''}`} onClick={() => navigateTo('list')}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg></button>
+        <button className={`footer-btn ${activeTab === 'detail' ? 'active-tab' : ''}`} onClick={() => navigateTo('detail')}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg></button>
+        <button className={`footer-btn ${activeTab === 'queue' ? 'active-tab' : ''}`} onClick={() => navigateTo('queue')}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg></button>
+        <button className={`footer-btn ${activeTab === 'albums' ? 'active-tab' : ''}`} onClick={() => navigateTo('albums')}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg></button>
+        <button className={`footer-btn ${activeTab === 'artists' ? 'active-tab' : ''}`} onClick={() => navigateTo('artists')}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></button>
+        <button className={`footer-btn ${activeTab === 'playlists' ? 'active-tab' : ''}`} onClick={() => navigateTo('playlists')}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg></button>
+        <button className={`footer-btn ${showSearch ? 'active-tab' : ''}`} onClick={() => { navigateTo('list'); setShowSearch(!showSearch); }}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></button>
       </nav>
     </div>
   )
