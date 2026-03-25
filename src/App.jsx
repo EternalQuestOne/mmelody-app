@@ -3,7 +3,7 @@ import { supabase } from './supabaseClient'
 import jsmediatags from 'jsmediatags/dist/jsmediatags.min.js'
 import './App.css'
 
-// ⚠️ CHANGE THIS TO YOUR ACTUAL CLOUDINARY CLOUD NAME!
+// Your exact Cloudinary Cloud Name
 const CLOUDINARY_CLOUD_NAME = 'dexx3rdkl'; 
 
 function App() {
@@ -28,6 +28,7 @@ function App() {
   }, [currentSong])
 
   async function getSongs() {
+    // Fetches songs and puts the newest ones at the top of the list
     const { data } = await supabase.from('songs').select('*').order('created_at', { ascending: false })
     if (data) setSongs(data)
   }
@@ -46,7 +47,7 @@ function App() {
     }
   }
 
-  // --- NEW: THE AUTOMATED UPLOAD ENGINE ---
+  // --- THE AUTOMATED UPLOAD ENGINE ---
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -89,7 +90,10 @@ function App() {
           const audioData = await audioRes.json();
           const audioUrl = audioData.secure_url;
 
-          // 4. Save Everything to Supabase
+          // 4. Extract Deep Tags and Save to Supabase
+          const extractedComposer = tags.TCOM ? tags.TCOM.data : '';
+          const extractedLyricist = tags.TEXT ? tags.TEXT.data : '';
+
           const newSong = {
             title: tags.title || file.name.replace('.mp3', ''),
             artist: tags.artist || '',
@@ -97,23 +101,28 @@ function App() {
             genre: tags.genre || '',
             release_year: tags.year || '',
             comment: tags.comment ? tags.comment.text : '',
-            composer: '', // Optional: ID3 tag mapping for these can be complex
-            lyricist: '', 
+            composer: extractedComposer, 
+            lyricist: extractedLyricist, 
             audio_url: audioUrl,
             cover_url: coverUrl
           };
 
           const { data, error } = await supabase.from('songs').insert([newSong]).select();
           
+          if (error) {
+            console.error("Database error:", error);
+            alert("Failed to save to Supabase.");
+          }
+
           if (data) {
-            setSongs([data[0], ...songs]); // Add new song to the top of the list
+            setSongs([data[0], ...songs]); // Add new song instantly to the UI
           }
         } catch (err) {
           console.error("Upload error:", err);
           alert("Error uploading file to Cloudinary.");
         } finally {
           setIsUploading(false);
-          event.target.value = null; // Reset the input
+          event.target.value = null; // Reset the input so you can upload the same file again if needed
         }
       },
       onError: function(error) {
@@ -134,7 +143,6 @@ function App() {
       <header className="header">
         <h2>Mmelody</h2>
         
-        {/* NEW: Upload Button Area */}
         <div className="upload-container">
           <button 
             className="upload-btn" 
