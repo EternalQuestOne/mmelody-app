@@ -363,11 +363,11 @@ body {
 .scroll-title { 
   font-size: 1.1rem; 
   font-weight: 700; 
-  color: #56CCF2; /* Brand blue */
+  color: #c9eaf5; /* Brand blue */
 }
 .scroll-artist { 
   font-size: 1.1rem; 
-  color: #a0a0a0; 
+  color: #4be0fa; 
 }
 
 .detail-interaction-row {
@@ -391,7 +391,7 @@ body {
 .favorite-filled { color: #ff4d4d; opacity: 1; }
 
 .detail-progress-container {
-  margin-bottom: 30px;
+  margin-bottom: 10px; /* Shrunk from 30px */
 }
 
 .progress-bar-bg {
@@ -470,12 +470,21 @@ body {
   grid-template-columns: 1fr;
   gap: 8px;
   margin-bottom: 15px;
+  text-align: left; /* Forces all tag details to the left */
 }
 
-.tag-item span { color: #888; font-weight: 500; margin-right: 5px; }
-.lyrics-box { border-top: 1px solid #333; padding-top: 15px; }
-.lyrics-box h4 { margin: 0 0 10px 0; color: #56CCF2; }
-.lyrics-box p { white-space: pre-wrap; line-height: 1.6; color: #ccc; }
+.tag-item span { 
+  color: #56CCF2; /* Matches the blue theme */
+  font-weight: 600; 
+  margin-right: 5px; 
+}
+.lyrics-box h4 { 
+  margin: 0 0 10px 0; 
+  color: #56CCF2; 
+  font-size: 1.3rem; /* Makes it bigger */
+  text-decoration: underline; /* Adds the underline */
+  text-align: left; /* Keeps it left-aligned with the text */
+}
 
 /* --- PLAYLIST VIEWS --- */
 .playlists-grid {
