@@ -27,8 +27,12 @@ body {
 
 .header h2 {
   margin: 0 0 15px 0;
-  font-size: 1.5rem;
+  font-size: 2rem; /* Made it a bit bigger */
   text-align: center;
+  /* Bring back the premium green gradient! */
+  background: linear-gradient(90deg, #1db954, #1ed760);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 /* --- NEW UPLOAD BUTTON STYLES --- */
