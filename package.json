@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.100.0",
+    "jsmediatags": "^3.9.7",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },

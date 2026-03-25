@@ -1,199 +1,154 @@
-/* 1. Main Background & Text */
+/* Dark, flat background */
 body {
-  background: linear-gradient(to bottom, #0a0a0a, #1a1a1a);
+  background-color: #000000;
   color: #ffffff;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   margin: 0;
-  min-height: 100vh;
+  padding: 0;
   display: flex;
   justify-content: center;
 }
 
-/* 2. App Container (Centers the app) */
 .app-container {
   width: 100%;
-  max-width: 480px;
-  padding: 40px 20px;
+  max-width: 500px;
   box-sizing: border-box;
-  margin: 0 auto;
 }
 
-/* 3. Header & Title */
+/* Minimal Header */
 .header {
-  text-align: center;
-  margin-bottom: 30px;
-}
-
-.header h1 {
-  font-size: 3.5rem;
-  margin: 0;
-  line-height: 1.3;
-  padding: 5px 0;
-  background: linear-gradient(90deg, #1db954, #1ed760);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.header p {
-  color: #a0a0a0;
-  font-size: 1.1rem;
-  margin-top: -5px; 
-}
-
-/* 4. Search Bar */
-.search-bar {
-  width: 100%;
-  padding: 14px 20px;
-  border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background-color: rgba(255, 255, 255, 0.05);
-  color: white;
-  font-size: 1rem;
-  margin-top: 20px;
-  box-sizing: border-box;
-  outline: none;
-  transition: all 0.3s ease;
-}
-
-.search-bar:focus {
-  border-color: #1db954;
-  background-color: rgba(255, 255, 255, 0.1);
-  box-shadow: 0 0 10px rgba(29, 185, 84, 0.2);
-}
-
-.search-bar::placeholder {
-  color: #888;
-}
-
-/* 5. Song List & Floating Cards */
-.song-list {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.song-card {
-  background-color: rgba(255, 255, 255, 0.05); 
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
   padding: 20px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  transition: all 0.3s ease;
+  background-color: #111;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid #222;
 }
 
-.song-card:hover {
-  background-color: rgba(255, 255, 255, 0.08);
-  transform: translateY(-5px);
+.header h2 {
+  margin: 0 0 15px 0;
+  font-size: 1.5rem;
+  text-align: center;
 }
 
-.playing-card {
-  border-color: rgba(29, 185, 84, 0.5);
-  background-color: rgba(29, 185, 84, 0.05);
-}
-
-/* 6. Layout for Image and Text (Keeps them side-by-side) */
-.song-content {
+/* --- NEW UPLOAD BUTTON STYLES --- */
+.upload-container {
   display: flex;
-  align-items: center;
-  gap: 15px;
+  justify-content: center;
   margin-bottom: 15px;
 }
 
-/* 7. Album Art Sizing (Stops them from getting huge!) */
-.album-art-container {
-  position: relative;
-  width: 70px;
-  height: 70px;
-  flex-shrink: 0; 
-}
-
-.album-art {
-  width: 70px;
-  height: 70px;
-  border-radius: 8px;
-  object-fit: cover;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
-}
-
-/* 8. Song Info Text */
-.song-info {
-  text-align: left;
-  flex-grow: 1; 
-}
-
-.song-info h3 {
-  margin: 0 0 4px 0;
-  font-size: 1.3rem;
-  font-weight: 600;
-  color: #ffffff;
-}
-
-.song-info p {
-  margin: 0;
-  color: #b3b3b3;
-  font-size: 0.95rem;
-}
-
-/* 9. Custom Play Buttons */
-.custom-play-btn {
-  width: 100%;
-  padding: 12px;
-  border-radius: 20px;
-  border: none;
-  font-size: 1rem;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.custom-play-btn.play {
+.upload-btn {
   background-color: #1db954;
-  color: #000000;
+  color: black;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, background-color 0.2s;
 }
 
-.custom-play-btn.play:hover {
+.upload-btn:hover:not(:disabled) {
   background-color: #1ed760;
-  transform: scale(1.02);
+  transform: scale(1.05);
 }
 
-.custom-play-btn.pause {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+.upload-btn:disabled {
+  background-color: #555;
+  color: #888;
+  cursor: not-allowed;
 }
+/* -------------------------------- */
 
-.custom-play-btn.pause:hover {
-  background-color: rgba(255, 255, 255, 0.15);
-}
-
-/* 10. Now Playing Animation */
-.now-playing-anim {
-  position: absolute;
-  top: 0;
-  left: 0;
+.search-bar {
   width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.6);
+  padding: 10px 15px;
   border-radius: 8px;
+  border: none;
+  background-color: #222;
+  color: white;
+  font-size: 1rem;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.search-bar:focus {
+  background-color: #333;
+}
+
+/* The List View */
+.song-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.list-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 15px;
+  cursor: pointer;
+  border-bottom: 1px solid #111;
+  transition: background-color 0.1s;
+}
+
+.list-item:hover {
+  background-color: #1a1a1a;
+}
+
+.list-item.active {
+  background-color: #222;
+}
+
+.list-item.active .list-title {
+  color: #1db954; 
+}
+
+/* The "=" Handle */
+.drag-handle {
+  color: #666;
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-right: 15px;
+  user-select: none;
+}
+
+/* Square Album Art */
+.list-art {
+  width: 45px;
+  height: 45px;
+  border-radius: 4px;
+  object-fit: cover;
+  margin-right: 15px;
+  background-color: #222;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  font-size: 1.5rem;
 }
 
-.bar {
-  width: 5px;
-  height: 15px;
-  background-color: #1db954;
-  border-radius: 3px;
-  animation: bounce 1s infinite ease-in-out;
+/* Text Layout */
+.list-info {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
-.bar:nth-child(1) { animation-delay: 0s; }
-.bar:nth-child(2) { animation-delay: 0.2s; }
-.bar:nth-child(3) { animation-delay: 0.4s; }
+.list-title {
+  font-size: 1.1rem;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
 
-@keyframes bounce {
-  0%, 100% { height: 10px; }
-  50% { height: 28px; }
+.list-subtitle {
+  color: #aaa;
+  font-size: 0.85rem;
+}
+
+/* Status Icon (Far Right) */
+.list-status {
+  width: 30px;
+  text-align: right;
+  font-size: 1.2rem;
 }
