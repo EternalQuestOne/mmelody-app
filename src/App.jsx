@@ -5,14 +5,13 @@ import './App.css'
 
 const CLOUDINARY_CLOUD_NAME = 'dexx3rdkl';
 
-// UPGRADED: Ultra-aggressive text extractor for messy MP3 tags
 const extractTagText = (frame) => {
   if (!frame) return '';
   if (typeof frame === 'string') return frame;
   if (frame.data) {
     if (typeof frame.data === 'string') return frame.data;
     if (typeof frame.data.text === 'string') return frame.data.text;
-    if (typeof frame.data.lyrics === 'string') return frame.data.lyrics; // Pulls lyrics specifically
+    if (typeof frame.data.lyrics === 'string') return frame.data.lyrics;
     if (typeof frame.data.description === 'string') return frame.data.description;
   }
   return '';
@@ -30,10 +29,12 @@ function App() {
   const [currentTimeFormatted, setCurrentTimeFormatted] = useState('0:00')
   const [uploadProgressText, setUploadProgressText] = useState('')
   const [showMoreDetails, setShowMoreDetails] = useState(false) 
+  
+  // NEW: State to track which 3-dot menu is currently open
+  const [activeMenu, setActiveMenu] = useState(null)
 
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
-  const pressTimer = useRef(null) 
 
   useEffect(() => {
     getSongs()
@@ -73,6 +74,7 @@ function App() {
     }
   }
 
+  // PURE tap-to-play logic (No timers!)
   const handlePlayPause = (song) => {
     if (currentSong && currentSong.audio_url === song.audio_url) {
       if (isPlaying) {
@@ -86,35 +88,33 @@ function App() {
       setCurrentSong(song)
       setIsPlaying(true)
     }
+    setActiveMenu(null); // Close any open menus when tapping a song
   }
 
-  // --- NEW: Perfected Touch & Hold Logic ---
-  const handlePointerDown = (song) => {
-    pressTimer.current = setTimeout(() => {
-      pressTimer.current = null; // Mark that long-press happened
-      if (!currentSong || currentSong.audio_url !== song.audio_url) {
-        setCurrentSong(song);
-        setIsPlaying(true);
-      }
-      setViewMode('detail');
-      setShowMoreDetails(false);
-    }, 400); // 400ms hold
+  // --- NEW: 3-Dot Menu Actions ---
+  const toggleMenu = (e, songId) => {
+    e.stopPropagation(); // Stops the row from being clicked
+    setActiveMenu(activeMenu === songId ? null : songId);
   }
 
-  const handlePointerUp = (song) => {
-    if (pressTimer.current) {
-      // If timer is still active, it was a quick tap! Play the song.
-      clearTimeout(pressTimer.current);
-      pressTimer.current = null;
-      handlePlayPause(song);
-    }
+  const handleGoToDetails = (e, song) => {
+    e.stopPropagation();
+    setCurrentSong(song);
+    setViewMode('detail');
+    setShowMoreDetails(false);
+    setActiveMenu(null);
   }
 
-  const handlePointerLeave = () => {
-    if (pressTimer.current) {
-      clearTimeout(pressTimer.current);
-      pressTimer.current = null;
-    }
+  const handleAddToQueue = (e) => {
+    e.stopPropagation();
+    alert("Song added to queue!"); 
+    setActiveMenu(null);
+  }
+
+  const handleAddToPlaylist = (e) => {
+    e.stopPropagation();
+    alert("Ready to add to playlist! (Architecture coming next)");
+    setActiveMenu(null);
   }
 
   const handleFileUpload = async (event) => {
@@ -202,7 +202,9 @@ function App() {
   )
 
   return (
-    <div className="app-root">
+    <div className="app-root" onClick={() => setActiveMenu(null)}> 
+      {/* Clicking anywhere on the app-root closes the dropdown menu */}
+      
       <audio
         ref={audioRef}
         src={currentSong ? currentSong.audio_url : ''}
@@ -263,6 +265,9 @@ function App() {
             {showMoreDetails && (
               <div className="more-details-content">
                 <div className="tag-grid">
+                  {/* NEW: Title and Artist added here */}
+                  <div className="tag-item"><span>Title:</span> {currentSong.title || 'Unknown'}</div>
+                  <div className="tag-item"><span>Artist:</span> {currentSong.artist || 'Unknown'}</div>
                   <div className="tag-item"><span>Subtitle:</span> {currentSong.subtitle || 'Unknown'}</div>
                   <div className="tag-item"><span>Album:</span> {currentSong.album || 'Unknown'}</div>
                   <div className="tag-item"><span>Year:</span> {currentSong.release_year || 'Unknown'}</div>
@@ -314,14 +319,13 @@ function App() {
           <div className="song-list">
             {filteredSongs.map((song, index) => {
               const isThisPlaying = currentSong && currentSong.audio_url === song.audio_url;
+              const uniqueId = song.id || index;
 
               return (
                 <div 
-                  key={song.id || index} 
+                  key={uniqueId} 
                   className={`list-item ${isThisPlaying ? 'active' : ''}`}
-                  onPointerDown={() => handlePointerDown(song)}
-                  onPointerUp={() => handlePointerUp(song)}
-                  onPointerLeave={handlePointerLeave}
+                  onClick={() => handlePlayPause(song)} 
                 >
                   <div className="drag-handle">=</div>
                   
@@ -335,7 +339,6 @@ function App() {
                     <div className="list-title">{song.title || 'Unknown Audio'}</div>
                     <div className="list-subtitle">
                       {song.artist && <span>{song.artist}</span>}
-                      {/* NEW: Elapsed time counter shown directly in the list! */}
                       {isThisPlaying && (
                         <span className="list-time-counter">
                            {song.artist ? ' • ' : ''}{currentTimeFormatted} / {song.duration || '0:00'}
@@ -368,6 +371,28 @@ function App() {
                         <span className="duration-text">{song.duration || '--:--'}</span>
                       )}
                     </div>
+
+                    {/* NEW: 3-Dot Menu Button & Dropdown */}
+                    <div className="menu-container">
+                      <button className="menu-btn" onClick={(e) => toggleMenu(e, uniqueId)}>
+                        ⋮
+                      </button>
+                      
+                      {activeMenu === uniqueId && (
+                        <div className="dropdown-menu">
+                          <div className="dropdown-item" onClick={(e) => handleGoToDetails(e, song)}>
+                            📄 Go to Details
+                          </div>
+                          <div className="dropdown-item" onClick={handleAddToQueue}>
+                            ⏮ Add to Queue
+                          </div>
+                          <div className="dropdown-item" onClick={handleAddToPlaylist}>
+                            💽 Add to Playlist
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                   </div>
                 </div>
               )
