@@ -66,6 +66,29 @@ function App() {
   const playlistFileInputRef = useRef(null)
   const moreDetailsRef = useRef(null)
 
+  // --- HARDWARE BACK BUTTON LOGIC ---
+  useEffect(() => {
+    window.history.replaceState({ tab: 'list' }, '', '');
+    const handleHardwareBack = (event) => {
+      if (event.state && event.state.tab) {
+        setActiveTab(event.state.tab);
+        setShowMoreDetails(false); 
+        setActiveMenu(null);
+        if (event.state.tab !== 'playlists') setViewingPlaylist(null);
+      } else { navigateTo('list'); }
+    };
+    window.addEventListener('popstate', handleHardwareBack);
+    return () => window.removeEventListener('popstate', handleHardwareBack);
+  }, []);
+
+  const navigateTo = (newTab) => {
+    if (activeTab === newTab && !viewingPlaylist) return;
+    setActiveTab(newTab);
+    if (newTab !== 'playlists') setViewingPlaylist(null); 
+    window.history.pushState({ tab: newTab }, '', `#${newTab}`);
+    window.scrollTo(0, 0);
+  };
+
   useEffect(() => { getSongs(); getPlaylists(); }, [])
 
   async function getSongs() {
@@ -78,7 +101,7 @@ function App() {
     if (data) setPlaylists(data)
   }
 
-  // --- Deletion Engine ---
+  // --- DELETION ENGINE ---
   const handleDeleteSongs = async (songsToDelete) => {
     const confirmText = songsToDelete.length === 1 
       ? `Delete "${songsToDelete[0].title}"?` 
@@ -102,11 +125,11 @@ function App() {
       setSelectedIds([]);
       setIsSelectionMode(false);
       if (songsToDelete.find(s => s.id === currentSong?.id)) { handleStop(); setCurrentSong(null); }
-    } catch (err) { console.error("Deletion Error:", err); }
+    } catch (err) { console.error(err); }
     finally { setIsUploading(false); setUploadProgressText(''); }
   };
 
-  // --- Playback Controls ---
+  // --- PLAYBACK ENGINE ---
   const handleStop = () => {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; setIsPlaying(false); setProgress(0); }
   }
@@ -121,6 +144,7 @@ function App() {
       setCurrentSong(song);
       setIsPlaying(true);
       audioRef.current.src = song.audio_url;
+      audioRef.current.load();
       audioRef.current.play();
     }
     setActiveMenu(null);
@@ -146,7 +170,10 @@ function App() {
     else handlePlayPause(list[list.length - 1]);
   }
 
-  // --- Sorting & Filtering ---
+  const handleSeekBackward = () => { if (audioRef.current) audioRef.current.currentTime -= 10; }
+  const handleSeekForward = () => { if (audioRef.current) audioRef.current.currentTime += 10; }
+
+  // --- SORTING & FILTERING ---
   const sortedSongs = [...songs].sort((a, b) => {
     if (sortOrder === 'az') return (a.title || '').localeCompare(b.title || '');
     if (sortOrder === 'za') return (b.title || '').localeCompare(a.title || '');
@@ -163,27 +190,36 @@ function App() {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   }
 
-  const navigateTo = (newTab) => {
-    setActiveTab(newTab);
-    if (newTab !== 'playlists') setViewingPlaylist(null);
+  // --- PLAYLIST CORE ---
+  const handleOpenPlaylist = async (playlist) => {
+    setViewingPlaylist(playlist);
+    const { data } = await supabase.from('playlist_songs').select('songs(*)').eq('playlist_id', playlist.id).order('added_at', { ascending: false });
+    if (data) { setPlaylistSongs(data.map(row => row.songs).filter(song => song !== null)); }
+  }
+
+  const handlePlaylistCoverUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file || !viewingPlaylist) return;
+    setIsUploading(true);
+    setUploadProgressText("Updating artwork...");
+    try {
+      if (viewingPlaylist.cover_url) {
+        const oldId = extractPublicId(viewingPlaylist.cover_url);
+        if (oldId) await fetch('/api/deleteImage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ public_id: oldId }) });
+      }
+      const imgFormData = new FormData();
+      imgFormData.append('file', file); imgFormData.append('upload_preset', 'mmelody_preset');
+      const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: imgFormData });
+      const coverUrl = (await imgRes.json()).secure_url;
+      const { data } = await supabase.from('playlists').update({ cover_url: coverUrl }).eq('id', viewingPlaylist.id).select();
+      if (data) {
+        setViewingPlaylist(data[0]); 
+        setPlaylists(playlists.map(p => p.id === data[0].id ? data[0] : p)); 
+      }
+    } catch (err) { console.error(err); } finally { setIsUploading(false); setUploadProgressText(''); }
   };
 
-  const openPlaylistModal = (e, song) => {
-    if (e) e.stopPropagation();
-    setSongToAddToPlaylist(song);
-    setIsPlaylistModalOpen(true);
-    setActiveMenu(null);
-  }
-
-  const handleGoToDetails = (e, song) => {
-    e.stopPropagation();
-    setCurrentSong(song);
-    navigateTo('detail');
-    setShowMoreDetails(false);
-    setActiveMenu(null);
-  }
-
-  // --- UPLOAD LOGIC ---
+  // --- UPLOAD CORE ---
   const handleFileUpload = async (event) => {
     const files = Array.from(event.target.files);
     if (files.length === 0) return;
@@ -195,40 +231,31 @@ function App() {
         const objectURL = URL.createObjectURL(file);
         const tempAudio = new Audio(objectURL);
         tempAudio.addEventListener('loadedmetadata', () => {
-          const mins = Math.floor(tempAudio.duration / 60);
-          const secs = Math.floor(tempAudio.duration % 60).toString().padStart(2, '0');
-          const durationStr = `${mins}:${secs}`;
+          const durationStr = `${Math.floor(tempAudio.duration / 60)}:${Math.floor(tempAudio.duration % 60).toString().padStart(2, '0')}`;
           URL.revokeObjectURL(objectURL);
           jsmediatags.read(file, {
             onSuccess: async function(tag) {
-              try {
-                const tags = tag.tags;
-                let coverUrl = '';
-                if (tags.picture) {
-                  const byteArray = new Uint8Array(tags.picture.data);
-                  const blob = new Blob([byteArray], { type: tags.picture.format });
-                  const imgFormData = new FormData();
-                  imgFormData.append('file', blob); imgFormData.append('upload_preset', 'mmelody_preset');
-                  const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: imgFormData });
-                  coverUrl = (await imgRes.json()).secure_url;
-                }
-                const audioFormData = new FormData();
-                audioFormData.append('file', file); audioFormData.append('upload_preset', 'mmelody_preset');
-                const audioRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/video/upload`, { method: 'POST', body: audioFormData });
-                const audioUrl = (await audioRes.json()).secure_url;
-
-                const { data } = await supabase.from('songs').insert([{
-                  title: tags.title || file.name.replace('.mp3', ''),
-                  artist: tags.artist || '', album: tags.album || '', duration: durationStr,
-                  lyrics: extractTagText(tags.USLT) || '', audio_url: audioUrl, cover_url: coverUrl,
-                  subtitle: extractTagText(tags.TIT3) || '', release_year: tags.year || '',
-                  composer: extractTagText(tags.TCOM) || '', lyricist: extractTagText(tags.TEXT) || '',
-                  genre: tags.genre || '', comment: extractTagText(tags.COMM) || ''
-                }]).select();
-                if (data) setSongs(prev => [data[0], ...prev]);
-              } catch (err) { console.error(err); } finally { resolve(); }
-            },
-            onError: () => resolve()
+              const tags = tag.tags;
+              let coverUrl = '';
+              if (tags.picture) {
+                const byteArray = new Uint8Array(tags.picture.data);
+                const blob = new Blob([byteArray], { type: tags.picture.format });
+                const imgFD = new FormData(); imgFD.append('file', blob); imgFD.append('upload_preset', 'mmelody_preset');
+                const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: imgFD });
+                coverUrl = (await imgRes.json()).secure_url;
+              }
+              const audioFD = new FormData(); audioFD.append('file', file); audioFD.append('upload_preset', 'mmelody_preset');
+              const audioRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/video/upload`, { method: 'POST', body: audioFD });
+              const audioUrl = (await audioRes.json()).secure_url;
+              const { data } = await supabase.from('songs').insert([{
+                title: tags.title || file.name.replace('.mp3', ''), artist: tags.artist || '', album: tags.album || '', duration: durationStr,
+                lyrics: extractTagText(tags.USLT) || '', audio_url: audioUrl, cover_url: coverUrl, subtitle: extractTagText(tags.TIT3) || '',
+                release_year: tags.year || '', composer: extractTagText(tags.TCOM) || '', lyricist: extractTagText(tags.TEXT) || '',
+                genre: tags.genre || '', comment: extractTagText(tags.COMM) || ''
+              }]).select();
+              if (data) setSongs(prev => [data[0], ...prev]);
+              resolve();
+            }, onError: () => resolve()
           });
         });
       });
@@ -236,6 +263,7 @@ function App() {
     setIsUploading(false); setUploadProgressText(''); event.target.value = null;
   }
 
+  // --- UI ROW RENDERER ---
   const renderSongRow = (song, index) => {
     const isThisPlaying = currentSong?.id === song.id;
     const isSelected = selectedIds.includes(song.id);
@@ -258,10 +286,10 @@ function App() {
               <button className="menu-btn" onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === song.id ? null : song.id); }}>⋮</button>
               {activeMenu === song.id && (
                 <div className="dropdown-menu">
-                  <div className="dropdown-item" onClick={(e) => handleGoToDetails(e, song)}>📄 Go to Details</div>
+                  <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setCurrentSong(song); navigateTo('detail'); setActiveMenu(null); }}>📄 Go to Details</div>
                   <div className="dropdown-item" onClick={() => { setQueue(prev => [song, ...prev]); setActiveMenu(null); alert("Play Next set!"); }}>⏭ Play Next</div>
                   <div className="dropdown-item" onClick={() => { setQueue(prev => [...prev, song]); setActiveMenu(null); alert("Added to Queue!"); }}>⏮ Add to Queue</div>
-                  <div className="dropdown-item" onClick={(e) => openPlaylistModal(e, song)}>💽 Add to Playlist</div>
+                  <div className="dropdown-item" onClick={() => { setSongToAddToPlaylist(song); setIsPlaylistModalOpen(true); setActiveMenu(null); }}>💽 Add to Playlist</div>
                   <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={() => handleDeleteSongs([song])}>🗑 Delete Song</div>
                 </div>
               )}
@@ -276,8 +304,7 @@ function App() {
     <div className="app-root" onClick={() => setActiveMenu(null)}>
       <audio ref={audioRef} onEnded={handleNextSong} onTimeUpdate={() => {
         const cur = audioRef.current.currentTime; const dur = audioRef.current.duration;
-        setProgress((cur / dur) * 100); const m = Math.floor(cur / 60); const s = Math.floor(cur % 60).toString().padStart(2, '0');
-        setCurrentTimeFormatted(`${m}:${s}`);
+        if(dur) { setProgress((cur / dur) * 100); const m = Math.floor(cur / 60); const s = Math.floor(cur % 60).toString().padStart(2, '0'); setCurrentTimeFormatted(`${m}:${s}`); }
       }} />
 
       {/* PLAYLIST MODAL */}
@@ -290,20 +317,11 @@ function App() {
               <input type="text" placeholder="New Playlist..." value={newPlaylistName} onChange={(e) => setNewPlaylistName(e.target.value)} className="modal-input" />
               <button className="modal-create-btn" onClick={async () => {
                 const { data } = await supabase.from('playlists').insert([{ name: newPlaylistName }]).select();
-                if (data) { 
-                  setPlaylists([data[0], ...playlists]); 
-                  await supabase.from('playlist_songs').insert([{ playlist_id: data[0].id, song_id: songToAddToPlaylist.id }]);
-                  setIsPlaylistModalOpen(false); alert("Created & Added!");
-                }
+                if (data) { setPlaylists([data[0], ...playlists]); await supabase.from('playlist_songs').insert([{ playlist_id: data[0].id, song_id: songToAddToPlaylist.id }]); setIsPlaylistModalOpen(false); alert("Created!"); }
               }}>Create</button>
             </div>
             <div className="modal-playlist-list">
-              {playlists.map(pl => (
-                <div key={pl.id} className="modal-playlist-item" onClick={async () => {
-                  await supabase.from('playlist_songs').insert([{ playlist_id: pl.id, song_id: songToAddToPlaylist.id }]);
-                  setIsPlaylistModalOpen(false); alert("Added!");
-                }}><span>{pl.name}</span></div>
-              ))}
+              {playlists.map(pl => ( <div key={pl.id} className="modal-playlist-item" onClick={async () => { await supabase.from('playlist_songs').insert([{ playlist_id: pl.id, song_id: songToAddToPlaylist.id }]); setIsPlaylistModalOpen(false); alert("Added!"); }}><span>{pl.name}</span></div> ))}
             </div>
             <button className="modal-close-btn" onClick={() => setIsPlaylistModalOpen(false)}>Cancel</button>
           </div>
@@ -334,21 +352,34 @@ function App() {
 
         {activeTab === 'detail' && currentSong && (
           <div className="detail-view-container">
-            <button className="back-btn" onClick={() => navigateTo('list')}>←</button>
+            <button className="back-btn" onClick={() => navigateTo('list')}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            </button>
             <div className="detail-art-container">{currentSong.cover_url ? <img src={currentSong.cover_url} className="detail-art" /> : <div className="detail-art placeholder-large">🎵</div>}</div>
             <div className="scrolling-wrapper"><div className="scrolling-text"><span className="scroll-title">{currentSong.title}</span><span className="scroll-artist"> • {currentSong.artist}</span></div></div>
             <div className="detail-progress-container"><div className="progress-bar-bg"><div className="progress-bar-fill" style={{ width: `${progress}%` }}></div></div><div className="time-row"><span>{currentTimeFormatted}</span><span>{currentSong.duration}</span></div></div>
             <div className="detail-playback-controls-bar">
-              <button className="pro-ctrl-btn" onClick={handlePreviousSong}>⏮</button>
-              <button className="pro-ctrl-btn master-play-pause-btn" onClick={() => handlePlayPause(currentSong)}>{isPlaying ? '⏸' : '▶'}</button>
-              <button className="pro-ctrl-btn" onClick={handleNextSong}>⏭</button>
+              <button className="pro-ctrl-btn" onClick={handleSeekBackward}><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg></button>
+              <button className="pro-ctrl-btn" onClick={handlePreviousSong}><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
+              <button className="pro-ctrl-btn master-play-pause-btn" onClick={() => handlePlayPause(currentSong)}>
+                {isPlaying ? <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg> : <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>}
+              </button>
+              <button className="pro-ctrl-btn" onClick={handleNextSong}><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6zm10-12h2v12h-2z"/></svg></button>
+              <button className="pro-ctrl-btn" onClick={handleSeekForward}><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6-8.5-6z"/></svg></button>
             </div>
             <button className="more-details-btn" onClick={() => setShowMoreDetails(!showMoreDetails)}>{showMoreDetails ? 'Hide' : 'More Details'}</button>
             {showMoreDetails && (
               <div className="more-details-content">
                 <div className="tag-grid">
+                  <div className="tag-item"><span>Title:</span> {currentSong.title}</div>
                   <div className="tag-item"><span>Artist:</span> {currentSong.artist}</div>
+                  <div className="tag-item"><span>Subtitle:</span> {currentSong.subtitle}</div>
                   <div className="tag-item"><span>Album:</span> {currentSong.album}</div>
+                  <div className="tag-item"><span>Year:</span> {currentSong.release_year}</div>
+                  <div className="tag-item"><span>Composer:</span> {currentSong.composer}</div>
+                  <div className="tag-item"><span>Lyricist:</span> {currentSong.lyricist}</div>
+                  <div className="tag-item"><span>Genre:</span> {currentSong.genre}</div>
+                  <div className="tag-item"><span>Comment:</span> {currentSong.comment}</div>
                 </div>
                 {currentSong.lyrics && <div className="lyrics-box"><h4>Lyrics</h4><p>{currentSong.lyrics}</p></div>}
               </div>
@@ -358,23 +389,40 @@ function App() {
 
         {activeTab === 'playlists' && (
           <div className="app-container">
-            <header className="header"><h2>Your Playlists</h2></header>
-            <div className="playlists-grid">
-              {playlists.map(pl => (
-                <div key={pl.id} className="playlist-card" onClick={() => { setViewingPlaylist(pl); setActiveTab('playlist-detail'); }}>
-                  <div className="playlist-card-art">💽</div><div className="playlist-card-title">{pl.name}</div>
+            <header className="header attractive-header" style={{paddingBottom: '20px'}}>
+              <div className="header-bg-glow"></div>
+              {viewingPlaylist ? (
+                <div className="playlist-deep-header">
+                  <button className="back-btn" onClick={() => setViewingPlaylist(null)}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                  </button>
+                  <div className="playlist-header-art" onClick={() => playlistFileInputRef.current.click()}>
+                    {isUploading ? <div className="pl-upload-spinner">⏳</div> : viewingPlaylist.cover_url ? <img src={viewingPlaylist.cover_url} alt="art" /> : <div className="pl-placeholder">📷 Tap</div>}
+                  </div>
+                  <h2 style={{margin:0, fontSize: '1.5rem'}}>{viewingPlaylist.name}</h2>
+                  <input type="file" accept="image/*" ref={playlistFileInputRef} onChange={handlePlaylistCoverUpload} style={{ display: 'none' }} />
                 </div>
-              ))}
+              ) : <h2 style={{ fontSize: '1.5rem', textAlign: 'center' }}>Your Playlists</h2>}
+            </header>
+            <div className="song-list">
+              {viewingPlaylist ? playlistSongs.map((s, i) => renderSongRow(s, i)) : (
+                <div className="playlists-grid">
+                  {playlists.map(pl => ( <div key={pl.id} className="playlist-card" onClick={() => handleOpenPlaylist(pl)}><div className="playlist-card-art">{pl.cover_url ? <img src={pl.cover_url} className="pl-grid-img" /> : '💽'}</div><div className="playlist-card-title">{pl.name}</div></div> ))}
+                </div>
+              )}
             </div>
           </div>
         )}
       </div>
 
       <nav className="bottom-footer">
-        <button className={`footer-btn ${activeTab === 'list' ? 'active-tab' : ''}`} onClick={() => navigateTo('list')}>List</button>
-        <button className={`footer-btn ${activeTab === 'detail' ? 'active-tab' : ''}`} onClick={() => navigateTo('detail')}>Detail</button>
-        <button className={`footer-btn ${activeTab === 'playlists' ? 'active-tab' : ''}`} onClick={() => navigateTo('playlists')}>Playlists</button>
-        <button className={`footer-btn ${showSearch ? 'active-tab' : ''}`} onClick={() => setShowSearch(!showSearch)}>🔍</button>
+        <button className={`footer-btn ${activeTab === 'list' ? 'active-tab' : ''}`} onClick={() => navigateTo('list')}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg></button>
+        <button className={`footer-btn ${activeTab === 'detail' ? 'active-tab' : ''}`} onClick={() => navigateTo('detail')}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg></button>
+        <button className={`footer-btn ${activeTab === 'queue' ? 'active-tab' : ''}`} onClick={() => navigateTo('queue')}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg></button>
+        <button className={`footer-btn ${activeTab === 'albums' ? 'active-tab' : ''}`} onClick={() => navigateTo('albums')}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg></button>
+        <button className={`footer-btn ${activeTab === 'artists' ? 'active-tab' : ''}`} onClick={() => navigateTo('artists')}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></button>
+        <button className={`footer-btn ${activeTab === 'playlists' ? 'active-tab' : ''}`} onClick={() => navigateTo('playlists')}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg></button>
+        <button className={`footer-btn ${showSearch ? 'active-tab' : ''}`} onClick={() => { navigateTo('list'); setShowSearch(!showSearch); }}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></button>
       </nav>
     </div>
   )
