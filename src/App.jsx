@@ -24,9 +24,8 @@ function App() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   
-  // NEW: Bottom Navigation State
-  const [activeTab, setActiveTab] = useState('list') // 'list', 'detail', 'queue', 'albums', 'artists', 'playlists'
-  const [showSearch, setShowSearch] = useState(false) // Toggles the search bar
+  const [activeTab, setActiveTab] = useState('list') 
+  const [showSearch, setShowSearch] = useState(false) 
   
   const [progress, setProgress] = useState(0)
   const [currentTimeFormatted, setCurrentTimeFormatted] = useState('0:00')
@@ -41,11 +40,7 @@ function App() {
     getSongs()
   }, [])
 
-  useEffect(() => {
-    if (currentSong && audioRef.current && !isPlaying) {
-      audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
-    }
-  }, [currentSong])
+  // NOTE: The auto-play useEffect has been completely removed to fix the mobile browser block!
 
   async function getSongs() {
     const { data } = await supabase.from('songs').select('*').order('created_at', { ascending: false })
@@ -75,8 +70,10 @@ function App() {
     }
   }
 
-  // GUARANTEED TAP-TO-PLAY
+  // --- GUARANTEED INSTANT TAP-TO-PLAY ---
   const handlePlayPause = (song) => {
+    if (!audioRef.current) return;
+
     if (currentSong && currentSong.audio_url === song.audio_url) {
       if (isPlaying) {
         audioRef.current.pause()
@@ -88,6 +85,10 @@ function App() {
     } else {
       setCurrentSong(song)
       setIsPlaying(true)
+      
+      // FIX: Inject URL directly to bypass mobile browser auto-play blockers!
+      audioRef.current.src = song.audio_url;
+      audioRef.current.play().catch(e => console.error("Playback blocked by browser:", e));
     }
     setActiveMenu(null); 
   }
@@ -288,7 +289,6 @@ function App() {
                 <input type="file" accept="audio/mpeg, audio/mp3" multiple ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} />
               </div>
 
-              {/* SEARCH BAR (Toggled by Footer Icon) */}
               {showSearch && (
                 <input
                   type="text"
@@ -308,7 +308,6 @@ function App() {
 
                 return (
                   <div key={uniqueId} className={`list-item ${isThisPlaying ? 'active' : ''}`}>
-                    {/* ISOLATED CLICKABLE AREA for perfect tapping */}
                     <div className="list-clickable-area" onClick={() => handlePlayPause(song)}>
                       <div className="drag-handle">=</div>
                       
@@ -355,7 +354,6 @@ function App() {
                         )}
                       </div>
 
-                      {/* 3-DOT MENU */}
                       <div className="menu-container">
                         <button className="menu-btn" onClick={(e) => toggleMenu(e, uniqueId)}>⋮</button>
                         {activeMenu === uniqueId && (
@@ -374,7 +372,7 @@ function App() {
           </div>
         )}
 
-        {/* --- PLACEHOLDER VIEWS FOR NEW FOOTER BUTTONS --- */}
+        {/* --- PLACEHOLDER VIEWS --- */}
         {['queue', 'albums', 'artists', 'playlists'].includes(activeTab) && (
           <div className="empty-state">
             <h3>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h3>
@@ -383,33 +381,26 @@ function App() {
         )}
       </div>
 
-      {/* --- NEW NATIVE BOTTOM NAVIGATION BAR --- */}
+      {/* --- NATIVE BOTTOM NAVIGATION BAR --- */}
       <nav className="bottom-footer">
-        {/* 1. List View */}
         <button className={`footer-btn ${activeTab === 'list' ? 'active-tab' : ''}`} onClick={() => setActiveTab('list')}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
         </button>
-        {/* 2. Detail View */}
         <button className={`footer-btn ${activeTab === 'detail' ? 'active-tab' : ''}`} onClick={() => setActiveTab('detail')}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
         </button>
-        {/* 3. Queue (Folder Icon) */}
         <button className={`footer-btn ${activeTab === 'queue' ? 'active-tab' : ''}`} onClick={() => setActiveTab('queue')}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
         </button>
-        {/* 4. Albums (Record Icon) */}
         <button className={`footer-btn ${activeTab === 'albums' ? 'active-tab' : ''}`} onClick={() => setActiveTab('albums')}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
         </button>
-        {/* 5. Artists (Human Icon) */}
         <button className={`footer-btn ${activeTab === 'artists' ? 'active-tab' : ''}`} onClick={() => setActiveTab('artists')}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
         </button>
-        {/* 6. Playlists (Tag Icon) */}
         <button className={`footer-btn ${activeTab === 'playlists' ? 'active-tab' : ''}`} onClick={() => setActiveTab('playlists')}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
         </button>
-        {/* 7. Search Toggle */}
         <button className={`footer-btn ${showSearch ? 'active-tab' : ''}`} onClick={() => { setActiveTab('list'); setShowSearch(!showSearch); }}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
         </button>
