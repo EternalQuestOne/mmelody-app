@@ -495,7 +495,7 @@ function App() {
                   <h2 style={{margin:0, fontSize: '1.5rem', textAlign:'left'}}>{viewingPlaylist.name}</h2>
                 </div>
               ) : (
-                <h2>Your Playlists</h2>
+                <h2 style={{ fontSize: '1.5rem' }}>Your Playlists</h2>
               )}
             </header>
 
