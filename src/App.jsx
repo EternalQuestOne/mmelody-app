@@ -36,38 +36,28 @@ function App() {
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
 
-  // --- NEW: Hardware Back Button Hook ---
+  // --- Hardware Back Button Hook ---
   useEffect(() => {
-    // 1. Tell the browser that our starting point is the 'list' tab
     window.history.replaceState({ tab: 'list' }, '', '');
-
-    // 2. Listen for the physical hardware back button being pressed
     const handleHardwareBack = (event) => {
       if (event.state && event.state.tab) {
         setActiveTab(event.state.tab);
-        setShowMoreDetails(false); // Close details if we are backing out
+        setShowMoreDetails(false); 
         setActiveMenu(null);
-      } else {
-        setActiveTab('list'); // Fallback safety
-      }
+      } else { setActiveTab('list'); }
     };
-
     window.addEventListener('popstate', handleHardwareBack);
     return () => window.removeEventListener('popstate', handleHardwareBack);
   }, []);
 
-  // --- NEW: Custom App Navigator ---
-  // Replaces standard setActiveTab so the phone remembers our history
   const navigateTo = (newTab) => {
     if (activeTab === newTab) return;
     setActiveTab(newTab);
     window.history.pushState({ tab: newTab }, '', `#${newTab}`);
-    window.scrollTo(0, 0); // Scrolls to top on screen change like a native app
+    window.scrollTo(0, 0);
   };
 
-  useEffect(() => {
-    getSongs()
-  }, [])
+  useEffect(() => { getSongs() }, [])
 
   async function getSongs() {
     const { data } = await supabase.from('songs').select('*').order('created_at', { ascending: false })
@@ -99,27 +89,54 @@ function App() {
 
   const handlePlayPause = (song) => {
     if (!audioRef.current) return;
-
     if (currentSong && currentSong.audio_url === song.audio_url) {
-      if (isPlaying) {
-        audioRef.current.pause()
-        setIsPlaying(false)
-      } else {
-        audioRef.current.play().catch(e => console.error(e));
-        setIsPlaying(true)
-      }
+      if (isPlaying) { audioRef.current.pause(); setIsPlaying(false); }
+      else { audioRef.current.play().catch(e => console.error(e)); setIsPlaying(true); }
     } else {
-      setCurrentSong(song)
-      setIsPlaying(true)
+      setCurrentSong(song);
+      setIsPlaying(true);
       audioRef.current.src = song.audio_url;
       audioRef.current.load(); 
-      audioRef.current.play().catch(e => {
-        console.error("Playback blocked:", e);
-        setIsPlaying(false); 
-      });
+      audioRef.current.play().catch(e => { console.error("Playback blocked:", e); setIsPlaying(false); });
     }
     setActiveMenu(null); 
   }
+
+  // --- NEW Playback Control Logic ---
+  const handlePreviousSong = () => {
+    if (!songs.length || !currentSong) return;
+    const currentIndex = songs.findIndex(s => s.audio_url === currentSong.audio_url);
+    // Descending sort means newer songs are at lower indices.
+    // Finding 'Previous' means finding an *older* song, i.e., index + 1
+    if (currentIndex < songs.length - 1) { handlePlayPause(songs[currentIndex + 1]); }
+    else { handlePlayPause(songs[0]); } // wrap to start
+  }
+
+  const handleNextSong = () => {
+    if (!songs.length || !currentSong) return;
+    const currentIndex = songs.findIndex(s => s.audio_url === currentSong.audio_url);
+    // Finding 'Next' means finding a *newer* song, i.e., index - 1
+    if (currentIndex > 0) { handlePlayPause(songs[currentIndex - 1]); }
+    else { handlePlayPause(songs[songs.length - 1]); } // wrap to end
+  }
+
+  const handleSeekBackward = () => { if (audioRef.current) audioRef.current.currentTime -= 10; }
+  const handleSeekForward = () => { if (audioRef.current) audioRef.current.currentTime += 10; }
+
+  // --- Other Interaction logic ---
+  const handleToggleFavorite = async () => {
+    if (!currentSong) return;
+    const newFavoriteState = !currentSong.is_favorite;
+    const { data } = await supabase.from('songs').update({ is_favorite: newFavoriteState }).eq('id', currentSong.id).select();
+    if (data) {
+      // update the local state of this song to prevent re-fetching the entire list
+      const updatedSongs = songs.map(s => (s.id === data[0].id ? data[0] : s));
+      setSongs(updatedSongs);
+      setCurrentSong(data[0]); 
+    }
+  }
+
+  const handleAddToPlaylistDetailed = () => { if (currentSong) alert("Open Playlist Selector! (Architecture coming next)"); }
 
   const toggleMenu = (e, songId) => {
     e.stopPropagation(); 
@@ -129,7 +146,7 @@ function App() {
   const handleGoToDetails = (e, song) => {
     e.stopPropagation();
     setCurrentSong(song);
-    navigateTo('detail'); // Uses our new hardware-safe navigator
+    navigateTo('detail');
     setShowMoreDetails(false);
     setActiveMenu(null);
   }
@@ -188,7 +205,8 @@ function App() {
                   lyricist: extractTagText(tags.TEXT) || extractTagText(tags.TOLY) || '',
                   lyrics: extractTagText(tags.USLT) || extractTagText(tags.SYLT) || '', 
                   audio_url: audioUrl,
-                  cover_url: coverUrl
+                  cover_url: coverUrl,
+                  is_favorite: false // default on new upload
                 };
 
                 const { data } = await supabase.from('songs').insert([newSong]).select();
@@ -236,6 +254,17 @@ function App() {
                 {currentSong.subtitle && <h4 className="detail-subtitle">{currentSong.subtitle}</h4>}
                 <p className="detail-artist">{currentSong.artist}</p>
               </div>
+
+              {/* Interaction row: favorite, info, playlist, more */}
+              <div className="detail-interaction-row">
+                <button className={`detail-inter-btn ${currentSong.is_favorite ? 'favorite-filled' : ''}`} onClick={handleToggleFavorite}>
+                  {/* heart icon filled vs outline */}
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill={currentSong.is_favorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                </button>
+                <button className="detail-inter-btn"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></button>
+                <button className="detail-inter-btn"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg></button>
+                <button className="detail-inter-btn menu-container"><button className="menu-btn" onClick={(e) => toggleMenu(e, currentSong.id)}>⋮</button>{activeMenu === currentSong.id && (<div className="dropdown-menu dropdown-upward"><div className="dropdown-item" onClick={handleToggleFavorite}>❤️ {currentSong.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div><div className="dropdown-item" onClick={handleAddToPlaylistDetailed}>💽 Add to Playlist</div></div>)}</button>
+              </div>
               
               <div className="detail-progress-container">
                 <div className="progress-bar-bg">
@@ -247,17 +276,19 @@ function App() {
                 </div>
               </div>
 
-              <div className="detail-controls">
-                <button className="pro-ctrl-btn stop-btn" onClick={handleStop}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-                </button>
-                <button className="pro-ctrl-btn play-pause-btn" onClick={() => handlePlayPause(currentSong)}>
+              {/* UPGRADED PROFESSIONAL CONTROLS BAR */}
+              <div className="detail-playback-controls-bar">
+                <button className="pro-ctrl-btn" onClick={handleSeekBackward}><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2.5 12a10 10 0 0 1 10-10 10 10 0 0 1 10 10 10 10 0 0 1-10 10 10 10 0 0 1-10-10zm10-8a8 8 0 0 0-8 8 8 8 0 0 0 8 8 8 8 0 0 0 8-8 8 8 0 0 0-8-8zM7 11v2h8v-2H7z"/></svg></button>
+                <button className="pro-ctrl-btn" onClick={handlePreviousSong}><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
+                <button className="pro-ctrl-btn master-play-pause-btn" onClick={() => handlePlayPause(currentSong)}>
                   {isPlaying ? (
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
                   ) : (
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
                   )}
                 </button>
+                <button className="pro-ctrl-btn" onClick={handleNextSong}><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6zm10-12h2v12h-2z"/></svg></button>
+                <button className="pro-ctrl-btn" onClick={handleSeekForward}><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2.5 12a10 10 0 0 1 10-10 10 10 0 0 1 10 10 10 10 0 0 1-10 10 10 10 0 0 1-10-10zm10-8a8 8 0 0 0-8 8 8 8 0 0 0 8 8 8 8 0 0 0 8-8 8 8 0 0 0-8-8zM17 11v2H9v-2h8z"/></svg></button>
               </div>
 
               <div className="more-details-wrapper">
@@ -309,7 +340,7 @@ function App() {
               
               <div className="upload-container">
                 <button className="upload-btn" onClick={() => fileInputRef.current.click()} disabled={isUploading}>
-                  {isUploading ? `⏳ ${uploadProgressText}` : 'Upload'}
+                  {isUploading ? `⏳ ${uploadProgressText}` : 'Bulk Upload MP3s'}
                 </button>
                 <input type="file" accept="audio/mpeg, audio/mp3" multiple ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} />
               </div>
@@ -385,6 +416,7 @@ function App() {
                           <div className="dropdown-menu">
                             <div className="dropdown-item" onClick={(e) => handleGoToDetails(e, song)}>📄 Go to Details</div>
                             <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); alert("Added to queue!"); }}>⏮ Add to Queue</div>
+                            <div className="dropdown-item" onClick={handleToggleFavorite}>❤️ {currentSong.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div>
                             <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); alert("Ready to build Playlists!"); }}>💽 Add to Playlist</div>
                           </div>
                         )}
