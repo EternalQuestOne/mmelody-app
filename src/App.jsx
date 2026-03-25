@@ -26,10 +26,18 @@ function App() {
       <div className="song-list">
         {songs.map((song, index) => (
           <div key={index} className="song-card">
-            <div className="song-info">
-              <h3>{song.title}</h3>
-              <p>{song.artist}</p>
+            
+            {/* NEW: This section holds the image and text side-by-side */}
+            <div className="song-content">
+              {song.cover_url && (
+                <img src={song.cover_url} alt="Album Art" className="album-art" />
+              )}
+              <div className="song-info">
+                <h3>{song.title}</h3>
+                <p>{song.artist}</p>
+              </div>
             </div>
+
             <audio controls src={song.audio_url} className="audio-player"></audio>
           </div>
         ))}

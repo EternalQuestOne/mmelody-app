@@ -1,4 +1,3 @@
-/* 1. Deep gradient background for a premium feel */
 body {
   background: linear-gradient(to bottom, #0a0a0a, #1a1a1a);
   color: #ffffff;
@@ -9,7 +8,6 @@ body {
   justify-content: center;
 }
 
-/* 2. Mobile-app width and breathing room */
 .app-container {
   width: 100%;
   max-width: 480px;
@@ -23,7 +21,6 @@ body {
   margin-bottom: 40px;
 }
 
-/* 3. Fix the clipping with line-height and padding */
 .header h1 {
   font-size: 3.5rem;
   margin: 0;
@@ -34,7 +31,6 @@ body {
   -webkit-text-fill-color: transparent;
 }
 
-/* 4. Fix subtitle spacing */
 .header p {
   color: #a0a0a0;
   font-size: 1.1rem;
@@ -47,38 +43,53 @@ body {
   gap: 20px;
 }
 
-/* 5. Glassmorphism card effect */
 .song-card {
   background-color: rgba(255, 255, 255, 0.05); 
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
-  padding: 24px;
+  padding: 20px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
   transition: all 0.3s ease;
 }
 
-/* 6. Subtle green glow on hover */
 .song-card:hover {
   background-color: rgba(255, 255, 255, 0.08);
   transform: translateY(-5px);
   border-color: rgba(29, 185, 84, 0.4); 
 }
 
+/* NEW: Flexbox to put the image and text in a row */
+.song-content {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+/* NEW: Styling for the album cover */
+.album-art {
+  width: 70px;
+  height: 70px;
+  border-radius: 8px;
+  object-fit: cover;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* Adjusted to align left since the image is next to it */
 .song-info {
-  text-align: center;
-  margin-bottom: 20px;
+  text-align: left;
 }
 
 .song-info h3 {
-  margin: 0 0 8px 0;
-  font-size: 1.5rem;
+  margin: 0 0 4px 0;
+  font-size: 1.3rem;
   font-weight: 600;
 }
 
 .song-info p {
   margin: 0;
   color: #b3b3b3;
-  font-size: 1rem;
+  font-size: 0.95rem;
 }
 
 .audio-player {
