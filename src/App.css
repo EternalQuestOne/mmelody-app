@@ -476,7 +476,7 @@ body {
   margin-top: 10px;
 }
 
-.lyrics-box h5 { 
+.lyrics-box h4 { 
   margin: 0 0 15px 0; 
   color: #56CCF2; 
   font-size: 1.3rem; 
@@ -487,8 +487,8 @@ body {
 .lyrics-box p { 
   white-space: pre-wrap; 
   line-height: 1.6; 
-  color: #ccc; 
-  text-align: left; 
+  color: #e5f6f7; 
+  text-align: center; 
   margin: 0;
   font-size: 1rem;
 }
