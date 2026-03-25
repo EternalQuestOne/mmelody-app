@@ -309,7 +309,7 @@ function App() {
               
               <div className="upload-container">
                 <button className="upload-btn" onClick={() => fileInputRef.current.click()} disabled={isUploading}>
-                  {isUploading ? `⏳ ${uploadProgressText}` : '➕ Upload Music'}
+                  {isUploading ? `⏳ ${uploadProgressText}` : '⬆️ Upload Music'}
                 </button>
                 <input type="file" accept="audio/mpeg, audio/mp3" multiple ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} />
               </div>
@@ -369,7 +369,7 @@ function App() {
                       
                       <div className="list-status">
                         {isThisPlaying && isPlaying ? (
-                          <svg className="playing-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1db954" strokeWidth="2" strokeLinecap="round">
+                          <svg className="playing-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#56CCF2" strokeWidth="2" strokeLinecap="round">
                             <path d="M11 5L6 9H2v6h4l5 4V5z"></path>
                             <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
                             <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>

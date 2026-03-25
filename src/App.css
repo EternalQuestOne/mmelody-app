@@ -21,7 +21,7 @@ body {
 .main-content-area {
   width: 100%;
   max-width: 500px;
-  padding-bottom: 70px; /* NEW: Prevents footer from covering last song */
+  padding-bottom: 70px;
 }
 
 .app-container, .detail-view-container {
@@ -44,6 +44,7 @@ body {
   overflow: hidden;
 }
 
+/* THEME: Deep Ocean Background Glow */
 .header-bg-glow {
   position: absolute;
   top: -50px;
@@ -51,26 +52,42 @@ body {
   transform: translateX(-50%);
   width: 200px;
   height: 100px;
-  background: #1db954;
+  background: #2F80ED;
   filter: blur(80px);
-  opacity: 0.3;
+  opacity: 0.35;
   z-index: -1;
 }
 
+/* THEME: Deep Ocean Text Gradient */
 .attractive-header h2 {
   margin: 0 0 20px 0;
   font-size: 2.2rem;
   text-align: center;
   font-weight: 800;
-  background: linear-gradient(90deg, #ffffff, #1db954);
+  background: linear-gradient(90deg, #ffffff, #56CCF2);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   letter-spacing: -0.5px;
 }
 
 .upload-container { display: flex; justify-content: center; margin-bottom: 15px; }
-.upload-btn { background-color: #1db954; color: #000; border: none; border-radius: 20px; padding: 10px 24px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
-.upload-btn:hover:not(:disabled) { transform: scale(1.02); }
+
+/* THEME: Deep Ocean Buttons */
+.upload-btn { 
+  background-color: #2F80ED; 
+  color: #ffffff; 
+  border: none; 
+  border-radius: 20px; 
+  padding: 10px 24px; 
+  font-weight: 700; 
+  cursor: pointer; 
+  transition: all 0.2s; 
+}
+.upload-btn:hover:not(:disabled) { 
+  background-color: #56CCF2; 
+  color: #000000;
+  transform: scale(1.02); 
+}
 .upload-btn:disabled { background-color: #333; color: #888; }
 
 .search-bar {
@@ -84,8 +101,9 @@ body {
   box-sizing: border-box;
   outline: none;
   margin-bottom: 10px;
+  transition: border-color 0.2s;
 }
-.search-bar:focus { border-color: #1db954; }
+.search-bar:focus { border-color: #56CCF2; } /* THEME */
 .animate-search { animation: slideDown 0.3s ease; }
 
 /* --- List View --- */
@@ -99,10 +117,11 @@ body {
   transition: background-color 0.2s;
 }
 .list-item:hover { background-color: rgba(255,255,255,0.03); }
-.list-item.active { background-color: rgba(29, 185, 84, 0.08); }
-.list-item.active .list-title { color: #1db954; }
 
-/* ISOLATED CLICKABLE AREA */
+/* THEME: Active Row */
+.list-item.active { background-color: rgba(47, 128, 237, 0.12); }
+.list-item.active .list-title { color: #56CCF2; }
+
 .list-clickable-area {
   display: flex;
   align-items: center;
@@ -127,9 +146,11 @@ body {
 .list-info { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; margin-right: 10px; }
 .list-title { font-size: 1.05rem; margin-bottom: 4px; font-weight: 500; }
 .list-subtitle { color: #999; font-size: 0.85rem; }
-.list-time-counter { color: #1db954; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+/* THEME: Timers and Bars */
+.list-time-counter { color: #56CCF2; font-weight: 500; font-variant-numeric: tabular-nums; }
 .list-progress-bar { width: 100%; height: 3px; background-color: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 6px; overflow: hidden; }
-.list-progress-fill { height: 100%; background-color: #1db954; }
+.list-progress-fill { height: 100%; background-color: #56CCF2; }
 
 .list-actions { display: flex; align-items: center; gap: 8px; }
 .list-stop-btn { background: transparent; border: none; color: #aaa; padding: 5px; cursor: pointer; }
@@ -164,14 +185,17 @@ body {
 @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
 /* --- Detail View --- */
-.detail-view-container { padding: 30px 20px; display: flex; flex-direction: column; background: linear-gradient(180deg, #181818 0%, #000000 100%); min-height: 100vh; }
+.detail-view-container { padding: 30px 20px; display: flex; flex-direction: column; background: linear-gradient(180deg, #121A2F 0%, #000000 100%); min-height: 100vh; }
 .detail-art-container { width: 100%; aspect-ratio: 1 / 1; margin-bottom: 30px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); border-radius: 12px; overflow: hidden; }
 .detail-art { width: 100%; height: 100%; object-fit: cover; }
 .placeholder-large { font-size: 5rem; background-color: #222; }
 .detail-info { text-align: left; margin-bottom: 30px; }
 .detail-info h2 { margin: 0 0 4px 0; font-size: 1.8rem; color: #fff; }
-.detail-subtitle { margin: 0 0 8px 0; font-size: 1.1rem; color: #1db954; font-weight: 500; }
+
+/* THEME */
+.detail-subtitle { margin: 0 0 8px 0; font-size: 1.1rem; color: #56CCF2; font-weight: 500; }
 .detail-artist { margin: 0; color: #aaa; font-size: 1.1rem; }
+
 .detail-progress-container { margin-bottom: 40px; }
 .progress-bar-bg { width: 100%; height: 5px; background: rgba(255,255,255,0.1); border-radius: 3px; margin-bottom: 8px; }
 .progress-bar-fill { height: 100%; background: #ffffff; border-radius: 3px; }
@@ -179,8 +203,21 @@ body {
 .detail-controls { display: flex; justify-content: center; align-items: center; gap: 40px; margin-bottom: 40px; }
 .pro-ctrl-btn { border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: transform 0.2s, background-color 0.2s; }
 .pro-ctrl-btn:active { transform: scale(0.95); }
-.play-pause-btn { width: 72px; height: 72px; background-color: #1db954; color: #000; box-shadow: 0 8px 24px rgba(29, 185, 84, 0.3); }
-.play-pause-btn:hover { background-color: #1ed760; transform: scale(1.04); }
+
+/* THEME: Master Play Button */
+.play-pause-btn { 
+  width: 72px; 
+  height: 72px; 
+  background-color: #2F80ED; 
+  color: #ffffff; 
+  box-shadow: 0 8px 24px rgba(47, 128, 237, 0.4); 
+}
+.play-pause-btn:hover { 
+  background-color: #56CCF2; 
+  color: #000;
+  transform: scale(1.04); 
+}
+
 .stop-btn { width: 50px; height: 50px; background-color: rgba(255,255,255,0.1); color: #fff; }
 .stop-btn:hover { background-color: rgba(255,255,255,0.2); }
 
@@ -192,7 +229,7 @@ body {
 .tag-item { font-size: 0.9rem; color: #ddd; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; }
 .tag-item span { color: #888; display: block; font-size: 0.8rem; margin-bottom: 2px; }
 .lyrics-box { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; }
-.lyrics-box h4 { margin: 0 0 15px 0; color: #1db954; }
+.lyrics-box h4 { margin: 0 0 15px 0; color: #56CCF2; } /* THEME */
 .lyrics-box p { white-space: pre-wrap; color: #ddd; line-height: 1.6; font-size: 0.95rem; margin: 0; }
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -200,32 +237,21 @@ body {
 .empty-state { padding: 50px 20px; text-align: center; color: #888; }
 .empty-state h3 { color: #fff; margin-bottom: 10px; font-size: 1.5rem; }
 
-/* --- NEW: BOTTOM FOOTER NAVIGATION --- */
+/* --- NATIVE BOTTOM NAVIGATION BAR --- */
 .bottom-footer {
   position: fixed;
   bottom: 0;
   width: 100%;
   max-width: 500px;
   height: 60px;
-  background-color: #111;
-  border-top: 1px solid #333;
+  background-color: #0A0F18; /* THEME: Slightly blue-tinted black */
+  border-top: 1px solid #1A2639;
   display: flex;
   justify-content: space-around;
   align-items: center;
   z-index: 1000;
 }
 
-.footer-btn {
-  background: transparent;
-  border: none;
-  color: #888;
-  cursor: pointer;
-  padding: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.2s;
-}
-
+.footer-btn { background: transparent; border: none; color: #66758C; cursor: pointer; padding: 10px; display: flex; align-items: center; justify-content: center; transition: color 0.2s; }
 .footer-btn:hover { color: #fff; }
-.footer-btn.active-tab { color: #1db954; }
+.footer-btn.active-tab { color: #56CCF2; } /* THEME */
