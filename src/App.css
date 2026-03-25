@@ -15,6 +15,7 @@ body {
   max-width: 480px;
   padding: 40px 20px;
   box-sizing: border-box;
+  margin: 0 auto;
 }
 
 .header {
