@@ -5,12 +5,16 @@ import './App.css'
 
 const CLOUDINARY_CLOUD_NAME = 'dexx3rdkl';
 
-// Aggressive text extractor for messy MP3 tags
+// UPGRADED: Ultra-aggressive text extractor for messy MP3 tags
 const extractTagText = (frame) => {
   if (!frame) return '';
   if (typeof frame === 'string') return frame;
-  if (typeof frame.data === 'string') return frame.data;
-  if (frame.data && typeof frame.data.text === 'string') return frame.data.text;
+  if (frame.data) {
+    if (typeof frame.data === 'string') return frame.data;
+    if (typeof frame.data.text === 'string') return frame.data.text;
+    if (typeof frame.data.lyrics === 'string') return frame.data.lyrics; // Pulls lyrics specifically
+    if (typeof frame.data.description === 'string') return frame.data.description;
+  }
   return '';
 };
 
@@ -25,7 +29,7 @@ function App() {
   const [progress, setProgress] = useState(0)
   const [currentTimeFormatted, setCurrentTimeFormatted] = useState('0:00')
   const [uploadProgressText, setUploadProgressText] = useState('')
-  const [showMoreDetails, setShowMoreDetails] = useState(false) // NEW: Toggle for deep info
+  const [showMoreDetails, setShowMoreDetails] = useState(false) 
 
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -35,7 +39,6 @@ function App() {
     getSongs()
   }, [])
 
-  // Only auto-play if the song actually changed to a NEW song
   useEffect(() => {
     if (currentSong && audioRef.current && !isPlaying) {
       audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
@@ -85,20 +88,33 @@ function App() {
     }
   }
 
+  // --- NEW: Perfected Touch & Hold Logic ---
   const handlePointerDown = (song) => {
     pressTimer.current = setTimeout(() => {
-      // Don't interrupt playing if we long-press the currently playing song
+      pressTimer.current = null; // Mark that long-press happened
       if (!currentSong || currentSong.audio_url !== song.audio_url) {
         setCurrentSong(song);
         setIsPlaying(true);
       }
       setViewMode('detail');
-      setShowMoreDetails(false); // Reset details toggle
-    }, 500); 
+      setShowMoreDetails(false);
+    }, 400); // 400ms hold
   }
 
-  const handlePointerUp = () => {
-    if (pressTimer.current) clearTimeout(pressTimer.current);
+  const handlePointerUp = (song) => {
+    if (pressTimer.current) {
+      // If timer is still active, it was a quick tap! Play the song.
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+      handlePlayPause(song);
+    }
+  }
+
+  const handlePointerLeave = () => {
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
   }
 
   const handleFileUpload = async (event) => {
@@ -145,19 +161,18 @@ function App() {
                 const audioRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/video/upload`, { method: 'POST', body: audioFormData });
                 const audioUrl = (await audioRes.json()).secure_url;
 
-                // NEW: Aggressive tag extraction
                 const newSong = {
                   title: tags.title || file.name.replace('.mp3', ''),
-                  subtitle: extractTagText(tags.TIT3),
+                  subtitle: extractTagText(tags.TIT3) || '',
                   artist: tags.artist || '',
                   album: tags.album || '',
                   genre: tags.genre || '',
                   release_year: tags.year || '',
                   duration: durationStr,
-                  comment: extractTagText(tags.COMM) || (tags.comment ? tags.comment.text : ''),
-                  composer: extractTagText(tags.TCOM), 
-                  lyricist: extractTagText(tags.TEXT) || extractTagText(tags.TOLY),
-                  lyrics: extractTagText(tags.USLT) || extractTagText(tags.SYLT), // Extract Lyrics
+                  comment: extractTagText(tags.COMM) || '',
+                  composer: extractTagText(tags.TCOM) || '', 
+                  lyricist: extractTagText(tags.TEXT) || extractTagText(tags.TOLY) || '',
+                  lyrics: extractTagText(tags.USLT) || extractTagText(tags.SYLT) || '', 
                   audio_url: audioUrl,
                   cover_url: coverUrl
                 };
@@ -188,9 +203,6 @@ function App() {
 
   return (
     <div className="app-root">
-      {/* CRITICAL FIX: The audio tag is now at the very top level! 
-        It will NEVER unmount when switching views, so the music won't stop.
-      */}
       <audio
         ref={audioRef}
         src={currentSong ? currentSong.audio_url : ''}
@@ -198,7 +210,7 @@ function App() {
         onTimeUpdate={handleTimeUpdate}
       />
 
-      {/* --- RENDER DETAIL VIEW --- */}
+      {/* --- DETAIL VIEW --- */}
       {viewMode === 'detail' && currentSong && (
         <div className="detail-view-container">
           <button className="back-btn" onClick={() => setViewMode('list')}>
@@ -230,7 +242,6 @@ function App() {
             </div>
           </div>
 
-          {/* UPGRADED PROFESSIONAL CONTROLS */}
           <div className="detail-controls">
             <button className="pro-ctrl-btn stop-btn" onClick={handleStop}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
@@ -244,15 +255,15 @@ function App() {
             </button>
           </div>
 
-          {/* MORE DETAILS TOGGLE SECTION */}
           <div className="more-details-wrapper">
             <button className="more-details-btn" onClick={() => setShowMoreDetails(!showMoreDetails)}>
-              {showMoreDetails ? 'Hide Details' : 'Show Complete ID3 & Lyrics'}
+              {showMoreDetails ? 'Hide Details' : 'More Details'}
             </button>
 
             {showMoreDetails && (
               <div className="more-details-content">
                 <div className="tag-grid">
+                  <div className="tag-item"><span>Subtitle:</span> {currentSong.subtitle || 'Unknown'}</div>
                   <div className="tag-item"><span>Album:</span> {currentSong.album || 'Unknown'}</div>
                   <div className="tag-item"><span>Year:</span> {currentSong.release_year || 'Unknown'}</div>
                   <div className="tag-item"><span>Composer:</span> {currentSong.composer || 'Unknown'}</div>
@@ -261,10 +272,14 @@ function App() {
                   <div className="tag-item"><span>Comment:</span> {currentSong.comment || 'None'}</div>
                 </div>
                 
-                {currentSong.lyrics && (
+                {currentSong.lyrics ? (
                   <div className="lyrics-box">
                     <h4>Lyrics</h4>
                     <p>{currentSong.lyrics}</p>
+                  </div>
+                ) : (
+                  <div className="lyrics-box">
+                    <p style={{color: '#888', fontStyle: 'italic'}}>No lyrics embedded in this file.</p>
                   </div>
                 )}
               </div>
@@ -273,7 +288,7 @@ function App() {
         </div>
       )}
 
-      {/* --- RENDER LIST VIEW --- */}
+      {/* --- LIST VIEW --- */}
       {viewMode === 'list' && (
         <div className="app-container">
           <header className="header attractive-header">
@@ -304,10 +319,9 @@ function App() {
                 <div 
                   key={song.id || index} 
                   className={`list-item ${isThisPlaying ? 'active' : ''}`}
-                  onClick={() => handlePlayPause(song)}
                   onPointerDown={() => handlePointerDown(song)}
-                  onPointerUp={handlePointerUp}
-                  onPointerLeave={handlePointerUp}
+                  onPointerUp={() => handlePointerUp(song)}
+                  onPointerLeave={handlePointerLeave}
                 >
                   <div className="drag-handle">=</div>
                   
@@ -319,7 +333,15 @@ function App() {
                   
                   <div className="list-info">
                     <div className="list-title">{song.title || 'Unknown Audio'}</div>
-                    {song.artist && <div className="list-subtitle">{song.artist}</div>}
+                    <div className="list-subtitle">
+                      {song.artist && <span>{song.artist}</span>}
+                      {/* NEW: Elapsed time counter shown directly in the list! */}
+                      {isThisPlaying && (
+                        <span className="list-time-counter">
+                           {song.artist ? ' • ' : ''}{currentTimeFormatted} / {song.duration || '0:00'}
+                        </span>
+                      )}
+                    </div>
                     
                     {isThisPlaying && (
                       <div className="list-progress-bar">
