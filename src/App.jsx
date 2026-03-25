@@ -16,6 +16,15 @@ const extractTagText = (frame) => {
   }
   return '';
 }
+// --- NEW: Helper to extract the Cloudinary ID from the URL ---
+const extractPublicId = (url) => {
+  try {
+    const parts = url.split('/');
+    const uploadIndex = parts.findIndex(p => p === 'upload');
+    const publicIdWithExt = parts.slice(uploadIndex + 2).join('/');
+    return publicIdWithExt.substring(0, publicIdWithExt.lastIndexOf('.'));
+  } catch (e) { return null; }
+};
 
 function App() {
   const [songs, setSongs] = useState([])
@@ -141,21 +150,36 @@ function App() {
     const file = event.target.files[0];
     if (!file || !viewingPlaylist) return;
     setIsUploading(true);
-    setUploadProgressText("Uploading Cover...");
 
     try {
+      // 1. If there's an old image, securely delete it via our new backend API
+      if (viewingPlaylist.cover_url) {
+        setUploadProgressText("Removing old cover...");
+        const oldPublicId = extractPublicId(viewingPlaylist.cover_url);
+        if (oldPublicId) {
+          await fetch('/api/deleteImage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ public_id: oldPublicId })
+          });
+        }
+      }
+
+      // 2. Upload the new image to Cloudinary
+      setUploadProgressText("Uploading new cover...");
       const imgFormData = new FormData();
       imgFormData.append('file', file);
       imgFormData.append('upload_preset', 'mmelody_preset');
       const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: imgFormData });
       const coverUrl = (await imgRes.json()).secure_url;
 
-      // Save new cover URL to Supabase
+      // 3. Save new cover URL to Supabase
+      setUploadProgressText("Saving to database...");
       const { data } = await supabase.from('playlists').update({ cover_url: coverUrl }).eq('id', viewingPlaylist.id).select();
 
       if (data) {
-        setViewingPlaylist(data[0]); // Update current view
-        setPlaylists(playlists.map(p => p.id === data[0].id ? data[0] : p)); // Update grid
+        setViewingPlaylist(data[0]); 
+        setPlaylists(playlists.map(p => p.id === data[0].id ? data[0] : p)); 
       }
     } catch (err) { console.error("Cover upload error:", err); } 
     finally { 
