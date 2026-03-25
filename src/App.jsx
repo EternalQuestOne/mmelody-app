@@ -309,7 +309,7 @@ function App() {
               
               <div className="upload-container">
                 <button className="upload-btn" onClick={() => fileInputRef.current.click()} disabled={isUploading}>
-                  {isUploading ? `⏳ ${uploadProgressText}` : 'Upload Music'}
+                  {isUploading ? `⏳ ${uploadProgressText}` : 'Upload'}
                 </button>
                 <input type="file" accept="audio/mpeg, audio/mp3" multiple ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} />
               </div>
