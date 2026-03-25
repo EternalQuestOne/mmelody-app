@@ -9,7 +9,11 @@ body {
   justify-content: center;
 }
 
-.app-root { width: 100%; display: flex; justify-content: center; }
+.app-root { 
+  width: 100%; 
+  display: flex; 
+  justify-content: center; 
+}
 
 .app-container, .detail-view-container {
   width: 100%;
@@ -57,7 +61,11 @@ body {
   letter-spacing: -0.5px;
 }
 
-.upload-container { display: flex; justify-content: center; margin-bottom: 15px; }
+.upload-container { 
+  display: flex; 
+  justify-content: center; 
+  margin-bottom: 15px; 
+}
 
 .upload-btn {
   background-color: #1db954;
@@ -86,7 +94,11 @@ body {
 .search-bar:focus { border-color: #1db954; }
 
 /* --- List View --- */
-.song-list { display: flex; flex-direction: column; padding-bottom: 50px; }
+.song-list { 
+  display: flex; 
+  flex-direction: column; 
+  padding-bottom: 50px; 
+}
 
 .list-item {
   display: flex;
@@ -115,9 +127,22 @@ body {
   justify-content: center;
 }
 
-.list-info { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; margin-right: 10px; }
+.list-info { 
+  flex-grow: 1; 
+  display: flex; 
+  flex-direction: column; 
+  justify-content: center; 
+  margin-right: 10px; 
+}
+
 .list-title { font-size: 1.05rem; margin-bottom: 4px; font-weight: 500; }
 .list-subtitle { color: #999; font-size: 0.85rem; }
+
+.list-time-counter {
+  color: #1db954;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums; 
+}
 
 .list-progress-bar {
   width: 100%;
@@ -130,7 +155,8 @@ body {
 .list-progress-fill { height: 100%; background-color: #1db954; }
 
 .list-actions { display: flex; align-items: center; gap: 12px; }
-.list-stop-btn { background: transparent; border: none; color: #aaa; padding: 5px; }
+.list-stop-btn { background: transparent; border: none; color: #aaa; padding: 5px; cursor: pointer; }
+.list-stop-btn:hover { color: #fff; }
 .list-status { width: 40px; text-align: right; display: flex; justify-content: flex-end; }
 .duration-text { color: #666; font-size: 0.85rem; font-weight: 500; }
 .playing-icon { animation: pulse 1.5s infinite alternate; }
@@ -158,6 +184,7 @@ body {
   cursor: pointer;
   margin-bottom: 20px;
 }
+.back-btn:hover { color: #fff; }
 
 .detail-art-container {
   width: 100%;
@@ -178,7 +205,7 @@ body {
 .detail-progress-container { margin-bottom: 40px; }
 .progress-bar-bg { width: 100%; height: 5px; background: rgba(255,255,255,0.1); border-radius: 3px; margin-bottom: 8px; }
 .progress-bar-fill { height: 100%; background: #ffffff; border-radius: 3px; }
-.time-row { display: flex; justify-content: space-between; color: #888; font-size: 0.85rem; }
+.time-row { display: flex; justify-content: space-between; color: #888; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
 
 /* --- Pro Play Controls --- */
 .detail-controls {
@@ -218,7 +245,11 @@ body {
 .stop-btn:hover { background-color: rgba(255,255,255,0.2); }
 
 /* --- More Details Section --- */
-.more-details-wrapper { margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; }
+.more-details-wrapper { 
+  margin-top: 20px; 
+  border-top: 1px solid rgba(255,255,255,0.1); 
+  padding-top: 20px; 
+}
 
 .more-details-btn {
   width: 100%;
@@ -233,7 +264,10 @@ body {
 }
 .more-details-btn:hover { background-color: rgba(255,255,255,0.05); }
 
-.more-details-content { margin-top: 20px; animation: fadeIn 0.3s ease; }
+.more-details-content { 
+  margin-top: 20px; 
+  animation: fadeIn 0.3s ease; 
+}
 
 .tag-grid {
   display: grid;
@@ -241,8 +275,19 @@ body {
   gap: 15px;
   margin-bottom: 25px;
 }
-.tag-item { font-size: 0.9rem; color: #ddd; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; }
-.tag-item span { color: #888; display: block; font-size: 0.8rem; margin-bottom: 2px; }
+.tag-item { 
+  font-size: 0.9rem; 
+  color: #ddd; 
+  background: rgba(255,255,255,0.05); 
+  padding: 10px; 
+  border-radius: 8px; 
+}
+.tag-item span { 
+  color: #888; 
+  display: block; 
+  font-size: 0.8rem; 
+  margin-bottom: 2px; 
+}
 
 .lyrics-box {
   background: rgba(255,255,255,0.05);
@@ -250,6 +295,15 @@ body {
   border-radius: 12px;
 }
 .lyrics-box h4 { margin: 0 0 15px 0; color: #1db954; }
-.lyrics-box p { white-space: pre-wrap; color: #ddd; line-height: 1.6; font-size: 0.95rem; margin: 0; }
+.lyrics-box p { 
+  white-space: pre-wrap; 
+  color: #ddd; 
+  line-height: 1.6; 
+  font-size: 0.95rem; 
+  margin: 0; 
+}
 
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { 
+  from { opacity: 0; transform: translateY(10px); } 
+  to { opacity: 1; transform: translateY(0); } 
+}
