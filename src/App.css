@@ -79,7 +79,7 @@ body {
 .brand-header h2 {
   margin: 0;
   font-size: 1.8rem;
-  background: linear-gradient(135deg, #56CCF2, #2F80ED); 
+  background: linear-gradient(90deg, #bfe9fd, #2F80ED); 
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   font-weight: 800;
@@ -92,7 +92,7 @@ body {
 }
 
 .upload-btn {
-  background: linear-gradient(135deg, #2F80ED, #56CCF2);
+  background: #4390f5; 
   color: white;
   border: none;
   padding: 8px 20px; 
@@ -100,8 +100,10 @@ body {
   font-weight: 600;
   font-size: 0.85rem; 
   cursor: pointer;
-  transition: transform 0.1s, filter 0.2s;
+  transition: transform 0.1s, background 0.2s;
 }
+
+.upload-btn:hover { background: #1f6ad0; } /* Subtle hover effect */
 
 .upload-btn:active {
   transform: scale(0.98);
