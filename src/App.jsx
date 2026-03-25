@@ -35,8 +35,6 @@ function App() {
 
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
-  
-  // NEW: Reference to the "More Details" section so we can scroll to it
   const moreDetailsRef = useRef(null)
 
   useEffect(() => {
@@ -132,10 +130,8 @@ function App() {
     }
   }
 
-  // --- NEW: Info Button Click Handler ---
   const handleOpenInfo = () => {
-    setShowMoreDetails(true); // Open the panel
-    // Wait a tiny fraction of a second for React to render the panel, then scroll to it!
+    setShowMoreDetails(true); 
     setTimeout(() => {
       moreDetailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
@@ -265,21 +261,16 @@ function App() {
                 <button className={`detail-inter-btn ${currentSong.is_favorite ? 'favorite-filled' : ''}`} onClick={handleToggleFavorite}>
                   <svg width="28" height="28" viewBox="0 0 24 24" fill={currentSong.is_favorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
                 </button>
-                
-                {/* UPGRADED: Solid 'i' Information Icon with click handler to scroll down */}
                 <button className="detail-inter-btn" onClick={handleOpenInfo}>
                   <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
                   </svg>
                 </button>
-
-                {/* UPGRADED: Explicit Add to Playlist Icon */}
                 <button className="detail-inter-btn" onClick={handleAddToPlaylistDetailed}>
                   <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zM2 16h8v-2H2v2zm14-1v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4z"/>
                   </svg>
                 </button>
-
                 <button className="detail-inter-btn menu-container"><button className="menu-btn" onClick={(e) => toggleMenu(e, currentSong.id)}>⋮</button>{activeMenu === currentSong.id && (<div className="dropdown-menu dropdown-upward"><div className="dropdown-item" onClick={handleToggleFavorite}>❤️ {currentSong.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div><div className="dropdown-item" onClick={handleAddToPlaylistDetailed}>💽 Add to Playlist</div></div>)}</button>
               </div>
               
@@ -294,11 +285,8 @@ function App() {
               </div>
 
               <div className="detail-playback-controls-bar">
-                {/* UPGRADED: Professional Double Arrow Rewind Icon */}
                 <button className="pro-ctrl-btn" onClick={handleSeekBackward}>
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/>
-                  </svg>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg>
                 </button>
                 <button className="pro-ctrl-btn" onClick={handlePreviousSong}><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
                 <button className="pro-ctrl-btn master-play-pause-btn" onClick={() => handlePlayPause(currentSong)}>
@@ -309,16 +297,11 @@ function App() {
                   )}
                 </button>
                 <button className="pro-ctrl-btn" onClick={handleNextSong}><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6zm10-12h2v12h-2z"/></svg></button>
-                
-                {/* UPGRADED: Professional Double Arrow Fast Forward Icon */}
                 <button className="pro-ctrl-btn" onClick={handleSeekForward}>
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6-8.5-6z"/>
-                  </svg>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6-8.5-6z"/></svg>
                 </button>
               </div>
 
-              {/* Added the ref here so the app knows where to scroll! */}
               <div className="more-details-wrapper" ref={moreDetailsRef}>
                 <button className="more-details-btn" onClick={() => setShowMoreDetails(!showMoreDetails)}>
                   {showMoreDetails ? 'Hide Details' : 'More Details'}
@@ -354,25 +337,37 @@ function App() {
           <div className="app-container">
             <header className="header attractive-header">
               <div className="header-bg-glow"></div>
-              <h2>Mmelody</h2>
+              
+              {/* --- NEW: RESONANCE PORTAL LOGO --- */}
+              <div className="brand-header">
+                <svg className="brand-logo" width="38" height="38" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="50" cy="50" r="46" stroke="#2F80ED" strokeWidth="2" strokeDasharray="4 4" opacity="0.6" />
+                  <circle cx="50" cy="50" r="36" stroke="#56CCF2" strokeWidth="3" opacity="0.8" />
+                  <circle cx="50" cy="50" r="24" fill="url(#blueGradient)" />
+                  <circle cx="15" cy="25" r="2.5" fill="#FFF" opacity="0.8"/>
+                  <circle cx="85" cy="35" r="1.5" fill="#56CCF2" />
+                  <circle cx="75" cy="85" r="2" fill="#FFF" opacity="0.6"/>
+                  <circle cx="25" cy="80" r="1.5" fill="#56CCF2" />
+                  <text x="50" y="62" fontFamily="system-ui, sans-serif" fontWeight="800" fontSize="38" fill="#ffffff" textAnchor="middle">m</text>
+                  <defs>
+                    <linearGradient id="blueGradient" x1="26" y1="26" x2="74" y2="74" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#56CCF2" />
+                      <stop offset="1" stopColor="#2F80ED" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <h2>mMelody</h2>
+              </div>
               
               <div className="upload-container">
                 <button className="upload-btn" onClick={() => fileInputRef.current.click()} disabled={isUploading}>
-                  {/* UPGRADED: Changed text from "Bulk Upload MP3s" to "Upload Music" */}
                   {isUploading ? `⏳ ${uploadProgressText}` : 'Upload Music'}
                 </button>
                 <input type="file" accept="audio/mpeg, audio/mp3" multiple ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} />
               </div>
 
               {showSearch && (
-                <input
-                  type="text"
-                  placeholder="Search songs or artists..."
-                  className="search-bar animate-search"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  autoFocus
-                />
+                <input type="text" placeholder="Search songs or artists..." className="search-bar animate-search" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} autoFocus />
               )}
             </header>
             
