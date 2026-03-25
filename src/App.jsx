@@ -5,6 +5,7 @@ import './App.css'
 
 const CLOUDINARY_CLOUD_NAME = 'dexx3rdkl';
 
+// --- MP3 Tag Extractor ---
 const extractTagText = (frame) => {
   if (!frame) return '';
   if (typeof frame === 'string') return frame;
@@ -16,32 +17,41 @@ const extractTagText = (frame) => {
   }
   return '';
 }
-// --- NEW: Helper to extract the Cloudinary ID from the URL ---
+
+// --- UPDATED: Bulletproof Cloudinary ID Extractor ---
 const extractPublicId = (url) => {
   try {
-    const parts = url.split('/');
-    const uploadIndex = parts.findIndex(p => p === 'upload');
-    const publicIdWithExt = parts.slice(uploadIndex + 2).join('/');
-    return publicIdWithExt.substring(0, publicIdWithExt.lastIndexOf('.'));
+    const parts = url.split('/upload/');
+    if (parts.length !== 2) return null;
+    let path = parts[1];
+    // Remove the version number (e.g., v1712345678/) if it exists
+    if (/^v\d+\//.test(path)) {
+      path = path.replace(/^v\d+\//, '');
+    }
+    // Remove the file extension (.jpg, .png)
+    const lastDot = path.lastIndexOf('.');
+    return lastDot !== -1 ? path.substring(0, lastDot) : path;
   } catch (e) { return null; }
 };
 
 function App() {
+  // --- Core State ---
   const [songs, setSongs] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [currentSong, setCurrentSong] = useState(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   
+  // --- UI State ---
   const [activeTab, setActiveTab] = useState('list') 
   const [showSearch, setShowSearch] = useState(false) 
-  
   const [progress, setProgress] = useState(0)
   const [currentTimeFormatted, setCurrentTimeFormatted] = useState('0:00')
   const [uploadProgressText, setUploadProgressText] = useState('')
   const [showMoreDetails, setShowMoreDetails] = useState(false) 
   const [activeMenu, setActiveMenu] = useState(null)
 
+  // --- Playlist State ---
   const [playlists, setPlaylists] = useState([])
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false)
   const [songToAddToPlaylist, setSongToAddToPlaylist] = useState(null)
@@ -49,11 +59,13 @@ function App() {
   const [viewingPlaylist, setViewingPlaylist] = useState(null) 
   const [playlistSongs, setPlaylistSongs] = useState([]) 
 
+  // --- Refs ---
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
-  const playlistFileInputRef = useRef(null) // NEW: Reference for Playlist Image Upload
+  const playlistFileInputRef = useRef(null)
   const moreDetailsRef = useRef(null)
 
+  // --- Hardware Back Button & Navigation ---
   useEffect(() => {
     window.history.replaceState({ tab: 'list' }, '', '');
     const handleHardwareBack = (event) => {
@@ -76,6 +88,7 @@ function App() {
     window.scrollTo(0, 0);
   };
 
+  // --- Initial Data Fetch ---
   useEffect(() => { 
     getSongs();
     getPlaylists(); 
@@ -91,20 +104,14 @@ function App() {
     if (data) setPlaylists(data)
   }
 
+  // --- Playlist Database Functions ---
   const handleCreateAndAddPlaylist = async () => {
     if (!newPlaylistName.trim() || !songToAddToPlaylist) return;
-    
     const { data: newPlaylistData } = await supabase.from('playlists').insert([{ name: newPlaylistName }]).select();
-    
     if (newPlaylistData) {
       const newPlaylist = newPlaylistData[0];
       setPlaylists([newPlaylist, ...playlists]);
-      
-      await supabase.from('playlist_songs').insert([{ 
-        playlist_id: newPlaylist.id, 
-        song_id: songToAddToPlaylist.id 
-      }]);
-      
+      await supabase.from('playlist_songs').insert([{ playlist_id: newPlaylist.id, song_id: songToAddToPlaylist.id }]);
       setNewPlaylistName('');
       setIsPlaylistModalOpen(false);
       setSongToAddToPlaylist(null);
@@ -114,38 +121,32 @@ function App() {
 
   const handleAddSongToExistingPlaylist = async (playlistId, playlistName) => {
     if (!songToAddToPlaylist) return;
-    
-    const { error } = await supabase.from('playlist_songs').insert([{ 
-      playlist_id: playlistId, 
-      song_id: songToAddToPlaylist.id 
-    }]);
-
-    if (error && error.code === '23505') {
-      alert("This song is already in that playlist!");
-    } else if (!error) {
+    const { error } = await supabase.from('playlist_songs').insert([{ playlist_id: playlistId, song_id: songToAddToPlaylist.id }]);
+    if (error && error.code === '23505') { alert("This song is already in that playlist!"); } 
+    else if (!error) {
       alert(`Added to ${playlistName}!`);
       setIsPlaylistModalOpen(false);
       setSongToAddToPlaylist(null);
-    } else {
-      console.error(error);
-    }
+    } else { console.error(error); }
   }
 
   const handleOpenPlaylist = async (playlist) => {
     setViewingPlaylist(playlist);
-    const { data } = await supabase
-      .from('playlist_songs')
-      .select('songs(*)')
-      .eq('playlist_id', playlist.id)
-      .order('added_at', { ascending: false });
-
+    const { data } = await supabase.from('playlist_songs').select('songs(*)').eq('playlist_id', playlist.id).order('added_at', { ascending: false });
     if (data) {
       const extractedSongs = data.map(row => row.songs).filter(song => song !== null);
       setPlaylistSongs(extractedSongs);
     }
   }
 
-  // --- NEW: Upload custom playlist cover image ---
+  const openPlaylistModal = (e, song) => {
+    if (e) e.stopPropagation();
+    setSongToAddToPlaylist(song);
+    setIsPlaylistModalOpen(true);
+    setActiveMenu(null);
+  }
+
+  // --- CUSTOM PLAYLIST COVER UPLOAD (WITH X-RAY LOGS) ---
   const handlePlaylistCoverUpload = async (event) => {
     const file = event.target.files[0];
     if (!file || !viewingPlaylist) return;
@@ -156,12 +157,18 @@ function App() {
       if (viewingPlaylist.cover_url) {
         setUploadProgressText("Removing old cover...");
         const oldPublicId = extractPublicId(viewingPlaylist.cover_url);
+        
+        console.log("🔍 Extracting ID from:", viewingPlaylist.cover_url);
+        console.log("🎯 Sending ID to server:", oldPublicId);
+
         if (oldPublicId) {
-          await fetch('/api/deleteImage', {
+          const deleteRes = await fetch('/api/deleteImage', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ public_id: oldPublicId })
           });
+          const deleteData = await deleteRes.json();
+          console.log("🤖 Server Response:", deleteData);
         }
       }
 
@@ -189,13 +196,7 @@ function App() {
     }
   };
 
-  const openPlaylistModal = (e, song) => {
-    if (e) e.stopPropagation();
-    setSongToAddToPlaylist(song);
-    setIsPlaylistModalOpen(true);
-    setActiveMenu(null);
-  }
-
+  // --- Playback Logic ---
   const handleTimeUpdate = () => {
     if (!audioRef.current) return;
     const current = audioRef.current.currentTime;
@@ -282,6 +283,7 @@ function App() {
     setActiveMenu(null);
   }
 
+  // --- MP3 Upload Logic ---
   const handleFileUpload = async (event) => {
     const files = Array.from(event.target.files);
     if (files.length === 0) return;
@@ -360,6 +362,7 @@ function App() {
     (song.artist && song.artist.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
+  // --- Row Component ---
   const renderSongRow = (song, index) => {
     const isThisPlaying = currentSong && currentSong.audio_url === song.audio_url;
     const uniqueId = song.id || index;
@@ -533,7 +536,6 @@ function App() {
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                   </button>
                   
-                  {/* UPGRADED: Clickable Playlist Art */}
                   <div className="playlist-header-art" onClick={() => playlistFileInputRef.current.click()}>
                     {isUploading ? (
                       <div className="pl-upload-spinner">⏳</div>
@@ -545,8 +547,6 @@ function App() {
                   </div>
                   
                   <h2 style={{margin:0, fontSize: '1.5rem', textAlign:'left'}}>{viewingPlaylist.name}</h2>
-                  
-                  {/* Hidden input strictly for playlist images */}
                   <input type="file" accept="image/*" ref={playlistFileInputRef} onChange={handlePlaylistCoverUpload} style={{ display: 'none' }} />
                 </div>
               ) : (
@@ -564,7 +564,6 @@ function App() {
               <div className="playlists-grid">
                 {playlists.map(pl => (
                   <div key={pl.id} className="playlist-card" onClick={() => handleOpenPlaylist(pl)}>
-                    {/* UPGRADED: Show Image if available, else CD */}
                     <div className="playlist-card-art">
                       {pl.cover_url ? <img src={pl.cover_url} alt="playlist art" className="pl-grid-img" /> : '💽'}
                     </div>
