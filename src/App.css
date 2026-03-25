@@ -71,6 +71,7 @@ body {
 .brand-header {
   display: flex;
   align-items: center;
+  justify-content: center; 
   gap: 12px;
   margin-bottom: 15px;
 }
@@ -86,17 +87,18 @@ body {
 
 .upload-container {
   margin-bottom: 15px;
+  display: flex;
+  justify-content: center; 
 }
 
 .upload-btn {
-  width: 100%;
   background: linear-gradient(135deg, #2F80ED, #56CCF2);
   color: white;
   border: none;
-  padding: 12px;
+  padding: 10px 24px; 
   border-radius: 8px;
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 0.95rem;
   cursor: pointer;
   transition: transform 0.1s, filter 0.2s;
 }
@@ -185,6 +187,8 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: flex-start; 
+  text-align: left; 
   overflow: hidden;
   flex: 1;
 }
