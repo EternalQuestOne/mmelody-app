@@ -78,11 +78,11 @@ body {
 
 .brand-header h2 {
   margin: 0;
-  font-size: 1.6rem;
-  background: linear-gradient(90deg, #ffffff, #a0a0a0);
+  font-size: 1.8rem;
+  background: linear-gradient(135deg, #56CCF2, #2F80ED); 
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .upload-container {
@@ -95,10 +95,10 @@ body {
   background: linear-gradient(135deg, #2F80ED, #56CCF2);
   color: white;
   border: none;
-  padding: 10px 24px; 
-  border-radius: 8px;
+  padding: 8px 20px; 
+  border-radius: 30px; 
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: 0.85rem; 
   cursor: pointer;
   transition: transform 0.1s, filter 0.2s;
 }
@@ -150,6 +150,10 @@ body {
 
 .list-item:hover { background: rgba(255,255,255,0.03); }
 .list-item.active { background: rgba(86, 204, 242, 0.1); }
+.list-item.active .list-title,
+.list-item.active .list-subtitle {
+  color: #56CCF2;
+}
 
 .list-clickable-area {
   display: flex;
