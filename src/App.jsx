@@ -17,16 +17,20 @@ function App() {
   }
 
   return (
-    <div>
-      <h1>Mmelody 🎵</h1>
-      <p>Your private music streaming app</p>
+    <div className="app-container">
+      <header className="header">
+        <h1>Mmelody 🎵</h1>
+        <p>Your private music streaming app</p>
+      </header>
       
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '30px' }}>
+      <div className="song-list">
         {songs.map((song, index) => (
-          <div key={index} style={{ padding: '15px', border: '1px solid #ccc', borderRadius: '8px' }}>
-            <h3 style={{ margin: '0 0 5px 0' }}>{song.title}</h3>
-            <p style={{ margin: '0 0 15px 0', color: 'gray' }}>{song.artist}</p>
-            <audio controls src={song.audio_url} style={{ width: '100%' }}></audio>
+          <div key={index} className="song-card">
+            <div className="song-info">
+              <h3>{song.title}</h3>
+              <p>{song.artist}</p>
+            </div>
+            <audio controls src={song.audio_url} className="audio-player"></audio>
           </div>
         ))}
       </div>
