@@ -86,7 +86,7 @@ body {
 }
 
 .upload-container {
-  margin-bottom: 15px;
+  margin-bottom: 5px; /* Shrunk from 15px */
   display: flex;
   justify-content: center; 
 }
@@ -140,14 +140,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px; /* Highly compact padding */
+  padding: 8px 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 4px;
   margin-bottom: 2px;
   background: transparent;
   transition: background 0.2s;
   position: relative;
-  overflow: hidden;
+  /* Removed overflow: hidden so the menu can escape! */
 }
 
 .list-item:hover { background: rgba(255,255,255,0.03); }
@@ -321,11 +321,12 @@ body {
 
 .detail-art-container {
   width: 100%;
+  max-width: 280px; /* Stops the image from getting too tall */
+  margin: 0 auto 20px auto; /* Centers the art and reduces bottom gap */
   aspect-ratio: 1 / 1;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-  margin-bottom: 30px;
   background: #111;
 }
 
@@ -359,8 +360,15 @@ body {
   100% { transform: translateX(-100%); }
 }
 
-.scroll-title { font-size: 1.6rem; font-weight: 700; }
-.scroll-artist { font-size: 1.2rem; color: #a0a0a0; }
+.scroll-title { 
+  font-size: 1.1rem; 
+  font-weight: 700; 
+  color: #56CCF2; /* Brand blue */
+}
+.scroll-artist { 
+  font-size: 1.1rem; 
+  color: #a0a0a0; 
+}
 
 .detail-interaction-row {
   display: flex;
@@ -411,7 +419,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 40px;
+  margin-bottom: 20px;
 }
 
 .pro-ctrl-btn {
