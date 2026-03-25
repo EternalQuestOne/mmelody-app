@@ -79,20 +79,20 @@ body {
 .brand-header h2 {
   margin: 0;
   font-size: 1.8rem;
-  background: linear-gradient(90deg, #bfe9fd, #2F80ED); 
+  background: linear-gradient(90deg, #B3E5FC, #2F80ED); 
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   font-weight: 800;
 }
 
 .upload-container {
-  margin-bottom: 5px; /* Shrunk from 15px */
+  margin-bottom: 5px; 
   display: flex;
   justify-content: center; 
 }
 
 .upload-btn {
-  background: #4390f5; 
+  background: #2F80ED; 
   color: white;
   border: none;
   padding: 8px 20px; 
@@ -103,16 +103,7 @@ body {
   transition: transform 0.1s, background 0.2s;
 }
 
-.upload-btn:hover { background: #1f6ad0; } /* Subtle hover effect */
-
-.upload-btn:active {
-  transform: scale(0.98);
-}
-
-.upload-btn:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
+.upload-btn:hover { background: #1f6ad0; }
 
 .search-bar {
   width: 100%;
@@ -126,9 +117,7 @@ body {
   transition: border-color 0.2s;
 }
 
-.search-bar:focus {
-  border-color: #56CCF2;
-}
+.search-bar:focus { border-color: #56CCF2; }
 
 /* --- MAIN COMPACT LIST VIEW --- */
 .song-list {
@@ -140,18 +129,18 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
+  padding: 8px 10px; 
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 4px;
   margin-bottom: 2px;
   background: transparent;
   transition: background 0.2s;
   position: relative;
-  /* Removed overflow: hidden so the menu can escape! */
 }
 
 .list-item:hover { background: rgba(255,255,255,0.03); }
 .list-item.active { background: rgba(86, 204, 242, 0.1); }
+
 .list-item.active .list-title,
 .list-item.active .list-subtitle {
   color: #56CCF2;
@@ -173,7 +162,7 @@ body {
 }
 
 .list-art {
-  width: 40px; /* Compact image size */
+  width: 40px; 
   height: 40px;
   border-radius: 4px;
   object-fit: cover;
@@ -200,7 +189,7 @@ body {
 }
 
 .list-title {
-  font-size: 0.95rem; /* Compact font */
+  font-size: 0.95rem; 
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -210,7 +199,7 @@ body {
 }
 
 .list-subtitle {
-  font-size: 0.8rem; /* Compact subtitle */
+  font-size: 0.8rem; 
   color: #a0a0a0;
   white-space: nowrap;
   overflow: hidden;
@@ -321,8 +310,8 @@ body {
 
 .detail-art-container {
   width: 100%;
-  max-width: 280px; /* Stops the image from getting too tall */
-  margin: 0 auto 20px auto; /* Centers the art and reduces bottom gap */
+  max-width: 280px; 
+  margin: 0 auto 20px auto; 
   aspect-ratio: 1 / 1;
   border-radius: 12px;
   overflow: hidden;
@@ -363,11 +352,12 @@ body {
 .scroll-title { 
   font-size: 1.1rem; 
   font-weight: 700; 
-  color: #c9eaf5; /* Brand blue */
+  color: #56CCF2; 
 }
+
 .scroll-artist { 
   font-size: 1.1rem; 
-  color: #4be0fa; 
+  color: #a0a0a0; 
 }
 
 .detail-interaction-row {
@@ -391,7 +381,7 @@ body {
 .favorite-filled { color: #ff4d4d; opacity: 1; }
 
 .detail-progress-container {
-  margin-bottom: 10px; /* Shrunk from 30px */
+  margin-bottom: 10px; 
 }
 
 .progress-bar-bg {
@@ -419,7 +409,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 20px; 
 }
 
 .pro-ctrl-btn {
@@ -465,25 +455,42 @@ body {
   font-size: 0.9rem;
 }
 
+/* --- MORE DETAILS & LYRICS STYLING --- */
 .tag-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 8px;
   margin-bottom: 15px;
-  text-align: left; /* Forces all tag details to the left */
+  text-align: left; 
 }
 
 .tag-item span { 
-  color: #56CCF2; /* Matches the blue theme */
+  color: #56CCF2; 
   font-weight: 600; 
   margin-right: 5px; 
 }
-.lyrics-box h4 { 
-  margin: 0 0 10px 0; 
+
+.lyrics-box { 
+  border-top: 1px solid #333; 
+  padding-top: 15px; 
+  margin-top: 10px;
+}
+
+.lyrics-box h5 { 
+  margin: 0 0 15px 0; 
   color: #56CCF2; 
-  font-size: 1.3rem; /* Makes it bigger */
-  text-decoration: underline; /* Adds the underline */
-  text-align: left; /* Keeps it left-aligned with the text */
+  font-size: 1.3rem; 
+  text-decoration: underline; 
+  text-align: center; 
+}
+
+.lyrics-box p { 
+  white-space: pre-wrap; 
+  line-height: 1.6; 
+  color: #ccc; 
+  text-align: left; 
+  margin: 0;
+  font-size: 1rem;
 }
 
 /* --- PLAYLIST VIEWS --- */
