@@ -465,146 +465,80 @@ body {
 .pl-add-icon { color: #56CCF2; font-size: 1.2rem; font-weight: bold; }
 .no-playlists-text { color: #888; text-align: center; font-size: 0.9rem; padding: 20px 0; }
 
-/* --- PLAYLISTS GRID UI --- */
-.playlists-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 15px;
-  padding: 15px;
-  margin-bottom: 30px;
+/* --- PLAYLISTS TAB SPECIFIC HEADER --- */
+.ocean-header {
+  padding: 15px 20px; /* Narrower ribbon */
+  border-bottom: 1px solid rgba(0, 150, 255, 0.2);
+  background: rgba(4, 20, 35, 0.95); /* Deep ocean background */
 }
-
-.playlist-card {
-  background: rgba(255,255,255,0.03);
-  border-radius: 12px;
-  padding: 10px;
+.ocean-glow {
+  background: #00B4DB; /* Ocean bright blue glow */
+  opacity: 0.25;
+}
+.ocean-title {
+  margin: 0;
+  font-size: 1.4rem; /* Neater, tighter font size */
+  font-weight: 700;
+  color: #ffffff;
   text-align: center;
+  letter-spacing: 0.5px;
+}
+
+/* --- YOUTUBE MUSIC STYLE PLAYLIST LIST --- */
+.playlists-list-view {
+  display: flex;
+  flex-direction: column;
+  padding: 0 0 30px 0;
+}
+
+.playlist-list-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 15px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  background: transparent;
   cursor: pointer;
-  transition: transform 0.2s, background 0.2s;
-  border: 1px solid rgba(255,255,255,0.05);
+  transition: background 0.2s;
 }
 
-.playlist-card:hover {
-  background: rgba(255,255,255,0.08);
-  transform: translateY(-2px);
+.playlist-list-item:hover {
+  background: rgba(255,255,255,0.05);
 }
 
-.playlist-art-wrapper {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  border-radius: 8px;
+.playlist-list-art {
+  width: 55px; /* Small, Youtube-style square */
+  height: 55px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.05);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-right: 15px;
+  flex-shrink: 0;
   overflow: hidden;
-  margin-bottom: 10px;
-  position: relative;
-  background: #1a1a1a;
 }
 
-.playlist-art-img {
+.playlist-list-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
 .playlist-art-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 3rem;
+  font-size: 1.8rem;
 }
 
-/* The dark overlay that appears so you can click the edit buttons */
-.playlist-art-overlay {
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.7);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 10px;
-  opacity: 0; /* Hidden by default */
-  transition: opacity 0.2s;
+.playlist-list-info {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
 }
 
-/* Show the overlay when hovering over the card */
-.playlist-card:hover .playlist-art-overlay {
-  opacity: 1;
-}
-
-.edit-art-btn {
-  background: #56CCF2;
-  color: #000;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 15px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.delete-art-btn {
-  background: transparent;
-  color: #ff4d4d;
-  border: 1px solid #ff4d4d;
-  padding: 6px 12px;
-  border-radius: 15px;
-  font-size: 0.8rem;
-  cursor: pointer;
-}
-
-.playlist-card-name {
+.playlist-list-name {
   color: #fff;
-  font-size: 0.95rem;
+  font-size: 0.95rem; /* Smaller, cleaner font */
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* --- NEW PLAYLIST CARD INFO STYLES --- */
-.playlist-card-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-}
-
-.playlist-card-info .playlist-card-name {
-  flex: 1;
-  text-align: left;
-  margin-right: 5px;
-}
-
-.spinner-pulse {
-  animation: pulse 1s infinite alternate;
-  font-size: 2.5rem;
-}
-
-/* --- STANDALONE CREATE PLAYLIST ROW --- */
-.create-standalone-playlist {
-  display: flex;
-  gap: 10px;
-  padding: 0 15px;
-  margin-top: 15px;
-  margin-bottom: 20px;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.standalone-playlist-input {
-  flex: 1;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
-  color: #fff;
-  padding: 12px 16px;
-  border-radius: 8px;
-  outline: none;
-  font-size: 0.95rem;
-  transition: border-color 0.2s;
-}
-
-.standalone-playlist-input:focus {
-  border-color: #56CCF2;
 }

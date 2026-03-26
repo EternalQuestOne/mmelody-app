@@ -203,6 +203,28 @@ function App() {
     finally { setIsUploading(false); setUploadProgressText(''); }
   };
 
+  const handleDeletePlaylist = async (playlist) => {
+    if (!window.confirm(`Are you sure you want to completely delete "${playlist.name}"?`)) return;
+    
+    setIsUploading(true);
+    setUploadProgressText("Deleting playlist...");
+
+    try {
+      // 1. If it has a custom cover, delete it from Cloudinary to save space
+      if (playlist.cover_url) {
+        const coverId = extractPublicId(playlist.cover_url);
+        if (coverId) await fetch('/api/deleteImage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ public_id: coverId })});
+      }
+
+      // 2. Delete from Supabase (SQL handles deleting the song links automatically!)
+      await supabase.from('playlists').delete().eq('id', playlist.id);
+      
+      // 3. Update the UI
+      setPlaylists(playlists.filter(p => p.id !== playlist.id));
+    } catch (err) { console.error("Playlist deletion error:", err); }
+    finally { setIsUploading(false); setUploadProgressText(''); }
+  };
+
   // NEW: Permanent multi-file deletion handler
   const handleDeleteSelected = async () => {
     if (selectedIds.length === 0) return;
@@ -725,19 +747,17 @@ function App() {
           </div>
         )}
 
-        {/* NEW: THE PLAYLISTS TAB UI */}
-        {/* NEW: THE PLAYLISTS TAB UI */}
+        {/* NEW: THE PLAYLISTS TAB UI (YouTube Music Style) */}
         {activeTab === 'playlists' && (
           <div className="app-container">
-            <header className="header attractive-header">
-              <div className="header-bg-glow"></div>
-              <h2>My Playlists</h2>
+            {/* The new Ocean Blue Header */}
+            <header className="header attractive-header ocean-header">
+              <div className="header-bg-glow ocean-glow"></div>
+              <h2 className="ocean-title">My Playlists</h2>
             </header>
             
-            {/* Hidden file input specifically for playlist covers */}
             <input type="file" accept="image/*" ref={playlistFileInputRef} onChange={handlePlaylistCoverUpload} style={{ display: 'none' }} />
 
-            {/* NEW: Standalone Create Playlist Row */}
             <div className="create-standalone-playlist">
               <input 
                 type="text" 
@@ -749,93 +769,55 @@ function App() {
               <button className="create-btn" onClick={handleCreatePlaylist}>Create</button>
             </div>
 
-            <div className="playlists-grid">
+            {/* The new Left-Aligned List View */}
+            <div className="playlists-list-view">
               {playlists.length === 0 ? (
-                <div className="empty-state"><h3>No Playlists</h3><p>Create one by clicking the Playlist icon on any song!</p></div>
+                <div className="empty-state"><h3>No Playlists</h3><p>Create one by typing a name above!</p></div>
               ) : (
-                playlists.map(playlist => (
-                  <div key={playlist.id} className="playlist-card" onClick={() => alert("Opening playlist songs logic coming next!")}>
-                    <div className="playlist-art-wrapper">
-                      {/* Shows a loading pulse while uploading this specific cover */}
+                playlists.map((playlist, index) => (
+                  <div key={playlist.id} className="playlist-list-item" onClick={() => alert("Opening playlist songs logic coming next!")}>
+                    
+                    <div className="playlist-list-art">
                       {isUploading && editingPlaylistId === playlist.id ? (
                         <div className="playlist-art-placeholder spinner-pulse">⏳</div>
                       ) : playlist.cover_url ? (
-                        <img src={playlist.cover_url} alt={playlist.name} className="playlist-art-img" />
+                        <img src={playlist.cover_url} alt={playlist.name} className="playlist-list-img" />
                       ) : (
                         <div className="playlist-art-placeholder">💽</div>
                       )}
                     </div>
                     
-                    {/* Info row with 3-dot menu instead of sticky hover */}
-                    <div className="playlist-card-info">
-                      <div className="playlist-card-name">{playlist.name}</div>
+                    <div className="playlist-list-info">
+                      <div className="playlist-list-name">{playlist.name}</div>
+                    </div>
                       
-                      <div className="menu-container">
-                        <button className="menu-btn" onClick={(e) => toggleMenu(e, `pl-${playlist.id}`)}>⋮</button>
-                        {activeMenu === `pl-${playlist.id}` && (
-                          <div className="dropdown-menu dropdown-upward" style={{ right: '-10px', top: 'auto', bottom: '30px' }}>
-                            <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); triggerPlaylistCoverUpload(playlist.id); }}>
-                              🖼 {playlist.cover_url ? 'Change Art' : 'Add Art'}
-                            </div>
-                            {playlist.cover_url && (
-                              <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleDeletePlaylistCover(e, playlist); }}>
-                                🗑 Remove Art
-                              </div>
-                            )}
+                    <div className="menu-container">
+                      <button className="menu-btn" onClick={(e) => toggleMenu(e, `pl-${playlist.id}`)}>⋮</button>
+                      {activeMenu === `pl-${playlist.id}` && (
+                        /* Opens upward automatically if it's near the bottom! */
+                        <div className={`dropdown-menu ${index >= playlists.length - 3 ? 'dropdown-upward' : ''}`} style={{ right: '0' }}>
+                          <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); triggerPlaylistCoverUpload(playlist.id); }}>
+                            🖼 {playlist.cover_url ? 'Change Art' : 'Add Art'}
                           </div>
-                        )}
-                      </div>
+                          {playlist.cover_url && (
+                            <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleDeletePlaylistCover(e, playlist); }}>
+                              🗑 Remove Art
+                            </div>
+                          )}
+                          {/* THE NEW DELETE PLAYLIST BUTTON */}
+                          <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleDeletePlaylist(playlist); }}>
+                            ❌ Delete Playlist
+                          </div>
+                        </div>
+                      )}
                     </div>
+
                   </div>
                 ))
               )}
             </div>
           </div>
         )}
-
-        {/* Updated Placeholder: Removed 'playlists' from the list */}
-        {['queue', 'albums', 'artists'].includes(activeTab) && (
-          <div className="empty-state"><h3>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h3><p>This architecture is coming soon!</p></div>
-        )}
-      </div>
-
-      {/* THE PLAYLIST SELECTION MODAL */}
-      {showPlaylistModal && (
-        <div className="modal-overlay" onClick={() => setShowPlaylistModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Add to Playlist</h3>
-              <button className="close-modal" onClick={() => setShowPlaylistModal(false)}>×</button>
-            </div>
-            
-            <div className="create-playlist-row">
-              <input 
-                type="text" 
-                placeholder="New playlist name..." 
-                value={newPlaylistName}
-                onChange={(e) => setNewPlaylistName(e.target.value)}
-              />
-              <button className="create-btn" onClick={handleCreatePlaylist}>Create</button>
-            </div>
-
-            <div className="playlist-options">
-              {playlists.length === 0 ? (
-                <p className="no-playlists-text">No playlists yet. Create one above!</p>
-              ) : (
-                playlists.map(pl => (
-                  <div key={pl.id} className="playlist-option-row" onClick={() => handleAddSongToPlaylist(pl.id, songForPlaylist.id)}>
-                    <div className="pl-art-mini">
-                      {pl.cover_url ? <img src={pl.cover_url} alt="cover" /> : '💽'}
-                    </div>
-                    <span className="pl-name">{pl.name}</span>
-                    <span className="pl-add-icon">+</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       <nav className="bottom-footer">
         <button className={`footer-btn ${activeTab === 'list' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'list')}>
