@@ -5,9 +5,17 @@ html, body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   margin: 0;
   padding: 0;
+  width: 100vw;
+  overflow-x: hidden; /* Prevents any horizontal sliding */
+  overscroll-behavior-y: none; /* Stops the bouncy white gap at the bottom */
+}
+
+/* We hand the centering logic to React's hidden wrapper instead of the body */
+#root {
+  width: 100%;
   display: flex;
   justify-content: center;
-  overscroll-behavior-y: none; /* Helps prevent the bouncy overscroll effect */
+  background-color: #000000;
 }
 
 .app-root { 
