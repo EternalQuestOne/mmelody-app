@@ -703,33 +703,37 @@ function App() {
         {/* NEW: THE PLAYLISTS TAB UI (YouTube Music Style) */}
         {activeTab === 'playlists' && (
           <div className="app-container">
-            <header className="header attractive-header ocean-header">
-              <div className="header-bg-glow ocean-glow"></div>
-              <h2 className="ocean-title">My Playlists</h2>
-            </header>
+            {/* NEW: Sticky Wrapper for Header + Controls */}
+            <div className="sticky-playlist-wrapper">
+              
+              <header className="ocean-header">
+                <div className="ocean-glow"></div>
+                <h2 className="ocean-title">My Playlists</h2>
+              </header>
+
+              <div className="create-standalone-playlist">
+                <input 
+                  type="text" 
+                  placeholder="Name your new playlist..." 
+                  value={newPlaylistName}
+                  onChange={(e) => setNewPlaylistName(e.target.value)}
+                  className="standalone-playlist-input"
+                />
+                <button className="create-btn" onClick={handleCreatePlaylist}>Create</button>
+              </div>
+
+              <div className="selection-toolbar" style={{ padding: '0 15px', marginTop: '-10px', marginBottom: '10px', justifyContent: 'flex-end' }}>
+                <select className="sort-select" value={playlistSortOrder} onChange={(e) => setPlaylistSortOrder(e.target.value)}>
+                  <option value="newest">Newest First</option>
+                  <option value="oldest">Oldest First</option>
+                  <option value="az">A-Z (Name)</option>
+                  <option value="za">Z-A (Name)</option>
+                </select>
+              </div>
+              
+            </div>
             
             <input type="file" accept="image/*" ref={playlistFileInputRef} onChange={handlePlaylistCoverUpload} style={{ display: 'none' }} />
-
-            <div className="create-standalone-playlist">
-              <input 
-                type="text" 
-                placeholder="Name your new playlist..." 
-                value={newPlaylistName}
-                onChange={(e) => setNewPlaylistName(e.target.value)}
-                className="standalone-playlist-input"
-              />
-              <button className="create-btn" onClick={handleCreatePlaylist}>Create</button>
-            </div>
-
-            {/* NEW: Playlist Sorting Dropdown */}
-            <div className="selection-toolbar" style={{ padding: '0 15px', marginTop: '-10px', marginBottom: '15px', justifyContent: 'flex-end' }}>
-              <select className="sort-select" value={playlistSortOrder} onChange={(e) => setPlaylistSortOrder(e.target.value)}>
-                <option value="newest">Newest First</option>
-                <option value="oldest">Oldest First</option>
-                <option value="az">A-Z (Name)</option>
-                <option value="za">Z-A (Name)</option>
-              </select>
-            </div>
 
             <div className="playlists-list-view">
               

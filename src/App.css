@@ -580,3 +580,14 @@ body {
   background: #FFE5EC; /* Light pink background */
   font-size: 1.6rem; /* Perfectly sizes the heart emoji */
 }
+/* --- STICKY PLAYLIST WRAPPER --- */
+.sticky-playlist-wrapper {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background-color: #000000; /* Solid black so scrolling playlists hide cleanly behind it */
+  padding-top: 10px; /* Gives a little breathing room at the top edge */
+  padding-bottom: 5px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05); /* Subtle line separating controls from the list */
+}
