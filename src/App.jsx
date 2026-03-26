@@ -20,13 +20,11 @@ const extractTagText = (frame) => {
   return '';
 }
 
-// NEW: Helper to extract Cloudinary public IDs for deletion
 const extractPublicId = (url) => {
   try {
     const parts = url.split('/upload/');
     if (parts.length !== 2) return null;
     let path = parts[1];
-    // Remove versioning (e.g., v1678901234/) if present
     if (/^v\d+\//.test(path)) path = path.replace(/^v\d+\//, '');
     const lastDot = path.lastIndexOf('.');
     return lastDot !== -1 ? path.substring(0, lastDot) : path;
@@ -41,10 +39,9 @@ function App() {
   const [isUploading, setIsUploading] = useState(false)
   const [isShuffle, setIsShuffle] = useState(false);
   
-  // NEW: Selection & Sorting State
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
-  const [sortOrder, setSortOrder] = useState('newest'); // Options: newest, oldest, az, za
+  const [sortOrder, setSortOrder] = useState('newest');
 
   const [activeTab, setActiveTab] = useState('list') 
   const [showSearch, setShowSearch] = useState(false) 
@@ -55,16 +52,16 @@ function App() {
   const [showMoreDetails, setShowMoreDetails] = useState(false) 
   const [activeMenu, setActiveMenu] = useState(null)
   
-  // NEW: Playlist State Variables
+  // Playlist State Variables
   const [playlists, setPlaylists] = useState([]);
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [songForPlaylist, setSongForPlaylist] = useState(null);
   const [newPlaylistName, setNewPlaylistName] = useState('');
+  const playlistFileInputRef = useRef(null);
+  const [editingPlaylistId, setEditingPlaylistId] = useState(null);
 
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
-  
-  // NEW: Reference to the "More Details" section so we can scroll to it
   const moreDetailsRef = useRef(null)
 
   useEffect(() => {
@@ -89,7 +86,7 @@ function App() {
 
   const handleFooterNavigation = (e, tab) => {
     e.preventDefault();
-    e.stopPropagation(); // CRITICAL: Stops the click from crashing Android
+    e.stopPropagation();
     setShowMoreDetails(false); 
     setActiveMenu(null); 
     navigateTo(tab);
@@ -97,7 +94,7 @@ function App() {
 
   useEffect(() => { 
     getSongs();
-    getPlaylists(); // NEW: Fetch playlists when app loads
+    getPlaylists();
   }, [])
 
   async function getSongs() {
@@ -105,7 +102,6 @@ function App() {
     if (data) setSongs(data)
   }
 
-  // NEW: Fetch Playlists function
   async function getPlaylists() {
     const { data } = await supabase.from('playlists').select('*').order('created_at', { ascending: false })
     if (data) setPlaylists(data)
@@ -128,20 +124,14 @@ function App() {
   };
 
   const handleAddSongToPlaylist = async (playlistId, songId) => {
-    // Insert into the junction table
     const { error } = await supabase.from('playlist_songs').insert([{ playlist_id: playlistId, song_id: songId }]);
-    
-    if (error && error.code !== '23505') { // 23505 is the error code if the song is already in the playlist
+    if (error && error.code !== '23505') {
       console.error("Error adding to playlist:", error);
     } else {
       setShowPlaylistModal(false);
       setSongForPlaylist(null);
     }
   };
-
-  // --- NEW: PLAYLIST COVER ART LOGIC ---
-  const playlistFileInputRef = useRef(null);
-  const [editingPlaylistId, setEditingPlaylistId] = useState(null);
 
   const triggerPlaylistCoverUpload = (playlistId) => {
     setEditingPlaylistId(playlistId);
@@ -156,21 +146,18 @@ function App() {
     setUploadProgressText("Updating cover...");
 
     try {
-      // 1. Check if the playlist already has a cover, and delete the old one from Cloudinary to save space!
       const playlist = playlists.find(p => p.id === editingPlaylistId);
       if (playlist && playlist.cover_url) {
         const oldCoverId = extractPublicId(playlist.cover_url);
         if (oldCoverId) await fetch('/api/deleteImage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ public_id: oldCoverId })});
       }
 
-      // 2. Upload the new cover
       const imgFormData = new FormData();
       imgFormData.append('file', file);
-      imgFormData.append('upload_preset', 'mMelody_preset'); // Make sure this matches your Cloudinary preset!
+      imgFormData.append('upload_preset', 'mMelody_preset');
       const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: imgFormData });
       const newCoverUrl = (await imgRes.json()).secure_url;
 
-      // 3. Update the Supabase database
       const { data } = await supabase.from('playlists').update({ cover_url: newCoverUrl }).eq('id', editingPlaylistId).select();
       if (data) {
         setPlaylists(playlists.map(p => p.id === editingPlaylistId ? data[0] : p));
@@ -210,22 +197,17 @@ function App() {
     setUploadProgressText("Deleting playlist...");
 
     try {
-      // 1. If it has a custom cover, delete it from Cloudinary to save space
       if (playlist.cover_url) {
         const coverId = extractPublicId(playlist.cover_url);
         if (coverId) await fetch('/api/deleteImage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ public_id: coverId })});
       }
 
-      // 2. Delete from Supabase (SQL handles deleting the song links automatically!)
       await supabase.from('playlists').delete().eq('id', playlist.id);
-      
-      // 3. Update the UI
       setPlaylists(playlists.filter(p => p.id !== playlist.id));
     } catch (err) { console.error("Playlist deletion error:", err); }
     finally { setIsUploading(false); setUploadProgressText(''); }
   };
 
-  // NEW: Permanent multi-file deletion handler
   const handleDeleteSelected = async () => {
     if (selectedIds.length === 0) return;
     if (!window.confirm(`Permanently delete ${selectedIds.length} selected song(s)?`)) return;
@@ -236,23 +218,18 @@ function App() {
 
     try {
       for (const song of songsToDelete) {
-        // 1. Delete Audio from Cloudinary
         const audioId = extractPublicId(song.audio_url);
         if (audioId) await fetch('/api/deleteAudio', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ public_id: audioId })});
         
-        // 2. Delete Cover from Cloudinary
         if (song.cover_url) {
           const coverId = extractPublicId(song.cover_url);
           if (coverId) await fetch('/api/deleteImage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ public_id: coverId })});
         }
-        // 3. Delete from Supabase
         await supabase.from('songs').delete().eq('id', song.id);
       }
-      // Update UI
       setSongs(prev => prev.filter(s => !selectedIds.includes(s.id)));
       setSelectedIds([]);
       setIsSelectionMode(false);
-      // Stop playback if current song was deleted
       if (songsToDelete.find(s => s.id === currentSong?.id)) {
         handleStop();
         setCurrentSong(null);
@@ -299,43 +276,34 @@ function App() {
     setActiveMenu(null); 
   }
 
-  // NEW: Sorting logic applied to the base songs array
   const sortedSongs = [...songs].sort((a, b) => {
     if (sortOrder === 'az') return (a.title || '').localeCompare(b.title || '');
     if (sortOrder === 'za') return (b.title || '').localeCompare(a.title || '');
     if (sortOrder === 'oldest') return new Date(a.created_at) - new Date(b.created_at);
-    return new Date(b.created_at) - new Date(a.created_at); // default/newest
+    return new Date(b.created_at) - new Date(a.created_at);
   });
 
   const handlePreviousSong = () => {
     if (!sortedSongs.length || !currentSong) return;
     const currentIndex = sortedSongs.findIndex(s => s.audio_url === currentSong.audio_url);
-    
-    // Previous goes UP the list (index - 1)
     if (currentIndex > 0) { 
       handlePlayPause(sortedSongs[currentIndex - 1]); 
     } else { 
-      // If at the top, loop to the very bottom
       handlePlayPause(sortedSongs[sortedSongs.length - 1]); 
     }
   }
 
   const handleNextSong = () => {
     if (!sortedSongs.length || !currentSong) return;
-
-    // 1. If Shuffle is ON, pick a random song
     if (isShuffle) {
       const randomIndex = Math.floor(Math.random() * sortedSongs.length);
       handlePlayPause(sortedSongs[randomIndex]);
       return; 
     }
-
-    // 2. If Shuffle is OFF, go DOWN the list natively (index + 1)
     const currentIndex = sortedSongs.findIndex(s => s.audio_url === currentSong.audio_url);
     if (currentIndex < sortedSongs.length - 1) { 
       handlePlayPause(sortedSongs[currentIndex + 1]); 
     } else { 
-      // If at the bottom, loop back to the top
       handlePlayPause(sortedSongs[0]); 
     }
   }
@@ -346,7 +314,6 @@ function App() {
   const handleSeek = (e) => {
     const seekPercentage = parseFloat(e.target.value);
     if (audioRef.current && audioRef.current.duration) {
-      // Calculate the exact second in the song based on the percentage swiped
       const newTime = (seekPercentage / 100) * audioRef.current.duration;
       audioRef.current.currentTime = newTime;
       setProgress(seekPercentage);
@@ -354,7 +321,6 @@ function App() {
   }
 
   const handleToggleFavorite = async (clickedSong) => {
-    // Determine if we are clicking a specific list item, or just the main Detail View button
     const targetSong = (clickedSong && clickedSong.audio_url) ? clickedSong : currentSong;
     if (!targetSong) return;
     
@@ -364,7 +330,6 @@ function App() {
     if (data) {
       const updatedSongs = songs.map(s => (s.id === data[0].id ? data[0] : s));
       setSongs(updatedSongs);
-      // Only update the currently playing song's UI if it was the one we just favorited!
       if (currentSong && currentSong.id === data[0].id) {
         setCurrentSong(data[0]); 
       }
@@ -502,13 +467,7 @@ function App() {
               </div>
 
               <div className="detail-interaction-row">
-                
-                {/* 1st Button: Shuffle Toggle */}
-                <button 
-                  className={`detail-inter-btn ${isShuffle ? 'active-info' : ''}`} 
-                  onClick={() => setIsShuffle(!isShuffle)} 
-                  title="Toggle Shuffle"
-                >
+                <button className={`detail-inter-btn ${isShuffle ? 'active-info' : ''}`} onClick={() => setIsShuffle(!isShuffle)} title="Toggle Shuffle">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="16 3 21 3 21 8"></polyline>
                     <line x1="4" y1="20" x2="21" y2="3"></line>
@@ -518,19 +477,16 @@ function App() {
                   </svg>
                 </button>
 
-                {/* 2nd Button: Favorite */}
-                <button className={`detail-inter-btn ${currentSong.is_favorite ? 'favorite-filled' : ''}`} onClick={handleToggleFavorite}>
+                <button className={`detail-inter-btn ${currentSong.is_favorite ? 'favorite-filled' : ''}`} onClick={() => handleToggleFavorite(currentSong)}>
                   <svg width="28" height="28" viewBox="0 0 24 24" fill={currentSong.is_favorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
                 </button>
 
-                {/* 3rd Button: Playlist */}
                 <button className="detail-inter-btn" onClick={() => handleOpenPlaylistModal(currentSong)}>
                   <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zM2 16h8v-2H2v2zm14-1v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4z"/>
                   </svg>
                 </button>
 
-                {/* 4th Button: Add to Queue */}
                 <button className="detail-inter-btn" onClick={() => alert("Add to Queue logic coming soon!")} title="Play Next in Queue">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="4" y1="6" x2="20" y2="6"></line>
@@ -541,20 +497,16 @@ function App() {
                   </svg>
                 </button>
                 
-                {/* 5th Button: Info (Moved to standard far-right position) */}
-                <button className={`detail-inter-btn ${showDetails ? 'active-info' : ''}`} onClick={handleOpenInfo}>
+                <button className={`detail-inter-btn ${showMoreDetails ? 'active-info' : ''}`} onClick={handleOpenInfo}>
                   <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
                   </svg>
                 </button>
-
               </div>
               
               <div className="detail-progress-container">
                 <div className="progress-bar-bg" style={{ position: 'relative' }}>
                   <div className="progress-bar-fill" style={{ width: `${progress}%` }}></div>
-                  
-                  {/* NEW: The invisible scrubber overlaid on top */}
                   <input 
                     type="range" 
                     min="0" 
@@ -565,7 +517,6 @@ function App() {
                     className="progress-scrubber"
                   />
                 </div>
-                
                 <div className="time-row">
                   <span>{currentTimeFormatted}</span>
                   <span>{currentSong.duration || '0:00'}</span>
@@ -586,12 +537,10 @@ function App() {
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
                   )}
                 </button>
-                
                 <button className="pro-ctrl-btn master-stop-btn" onClick={handleStop}>
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
                 </button>
                 <button className="pro-ctrl-btn" onClick={handleNextSong}><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6zm10-12h2v12h-2z"/></svg></button>
-                
                 <button className="pro-ctrl-btn" onClick={handleSeekForward}>
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6-8.5-6z"/>
@@ -634,7 +583,6 @@ function App() {
           <div className="app-container">
             <header className="header attractive-header">
               <div className="header-bg-glow"></div>
-              {/* NEW: Updated structure to hold logo and text together */}
               <div className="brand-header-wrapper">
                   <img src={logoImage} alt="mMelody logo" className="app-logo" />
                   <h2>mMelody</h2>
@@ -647,7 +595,6 @@ function App() {
                 <input type="file" accept="audio/mpeg, audio/mp3" multiple ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} />
               </div>
 
-              {/* NEW: Selection and Sorting Toolbar */}
               <div className="selection-toolbar">
                 <div className="toolbar-left">
                   <button className="action-icon-btn" onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }}>
@@ -683,7 +630,7 @@ function App() {
               {filteredSongs.map((song, index) => {
                 const isThisPlaying = currentSong && currentSong.audio_url === song.audio_url;
                 const uniqueId = song.id || index;
-                const isSelected = selectedIds.includes(song.id); // NEW: Check if selected
+                const isSelected = selectedIds.includes(song.id); 
 
                 return (
                   <div key={uniqueId} className={`list-item ${isThisPlaying ? 'active' : ''} ${isSelected ? 'selected-row' : ''}`}>
@@ -711,7 +658,6 @@ function App() {
                       </div>
                     </div>
 
-                    {/* NEW: Hide normal actions when in selection mode */}
                     {!isSelectionMode && (
                       <div className="list-actions">
                         {isThisPlaying && (
@@ -733,7 +679,6 @@ function App() {
                               <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); alert("Added to queue!"); }}>⏮ Add to Queue</div>
                               <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); handleToggleFavorite(song); }}>❤️ {song.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div>
                               <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); handleOpenPlaylistModal(song); }}>💽 Add to Playlist</div>
-                              {/* NEW: Singular Delete in Menu */}
                               <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={() => { setSelectedIds([song.id]); handleDeleteSelected(); }}>🗑 Delete Song</div>
                             </div>
                           )}
@@ -750,7 +695,6 @@ function App() {
         {/* NEW: THE PLAYLISTS TAB UI (YouTube Music Style) */}
         {activeTab === 'playlists' && (
           <div className="app-container">
-            {/* The new Ocean Blue Header */}
             <header className="header attractive-header ocean-header">
               <div className="header-bg-glow ocean-glow"></div>
               <h2 className="ocean-title">My Playlists</h2>
@@ -769,7 +713,6 @@ function App() {
               <button className="create-btn" onClick={handleCreatePlaylist}>Create</button>
             </div>
 
-            {/* The new Left-Aligned List View */}
             <div className="playlists-list-view">
               {playlists.length === 0 ? (
                 <div className="empty-state"><h3>No Playlists</h3><p>Create one by typing a name above!</p></div>
@@ -794,7 +737,6 @@ function App() {
                     <div className="menu-container">
                       <button className="menu-btn" onClick={(e) => toggleMenu(e, `pl-${playlist.id}`)}>⋮</button>
                       {activeMenu === `pl-${playlist.id}` && (
-                        /* Opens upward automatically if it's near the bottom! */
                         <div className={`dropdown-menu ${index >= playlists.length - 3 ? 'dropdown-upward' : ''}`} style={{ right: '0' }}>
                           <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); triggerPlaylistCoverUpload(playlist.id); }}>
                             🖼 {playlist.cover_url ? 'Change Art' : 'Add Art'}
@@ -804,7 +746,6 @@ function App() {
                               🗑 Remove Art
                             </div>
                           )}
-                          {/* THE NEW DELETE PLAYLIST BUTTON */}
                           <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleDeletePlaylist(playlist); }}>
                             ❌ Delete Playlist
                           </div>
@@ -818,6 +759,48 @@ function App() {
             </div>
           </div>
         )}
+
+        {['queue', 'albums', 'artists'].includes(activeTab) && (
+          <div className="empty-state"><h3>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h3><p>This architecture is coming soon!</p></div>
+        )}
+      </div>
+
+      {showPlaylistModal && (
+        <div className="modal-overlay" onClick={() => setShowPlaylistModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Add to Playlist</h3>
+              <button className="close-modal" onClick={() => setShowPlaylistModal(false)}>×</button>
+            </div>
+            
+            <div className="create-playlist-row">
+              <input 
+                type="text" 
+                placeholder="New playlist name..." 
+                value={newPlaylistName}
+                onChange={(e) => setNewPlaylistName(e.target.value)}
+              />
+              <button className="create-btn" onClick={handleCreatePlaylist}>Create</button>
+            </div>
+
+            <div className="playlist-options">
+              {playlists.length === 0 ? (
+                <p className="no-playlists-text">No playlists yet. Create one above!</p>
+              ) : (
+                playlists.map(pl => (
+                  <div key={pl.id} className="playlist-option-row" onClick={() => handleAddSongToPlaylist(pl.id, songForPlaylist.id)}>
+                    <div className="pl-art-mini">
+                      {pl.cover_url ? <img src={pl.cover_url} alt="cover" /> : '💽'}
+                    </div>
+                    <span className="pl-name">{pl.name}</span>
+                    <span className="pl-add-icon">+</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <nav className="bottom-footer">
         <button className={`footer-btn ${activeTab === 'list' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'list')}>
