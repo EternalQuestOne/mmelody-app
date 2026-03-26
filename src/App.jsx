@@ -346,7 +346,20 @@ function App() {
                   </svg>
                 </button>
 
-                <button className="detail-inter-btn menu-container"><button className="menu-btn" onClick={(e) => toggleMenu(e, currentSong.id)}>⋮</button>{activeMenu === currentSong.id && (<div className="dropdown-menu dropdown-upward"><div className="dropdown-item" onClick={handleToggleFavorite}>❤️ {currentSong.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div><div className="dropdown-item" onClick={handleAddToPlaylistDetailed}>💽 Add to Playlist</div></div>)}</button>
+                <button 
+                  className="detail-inter-btn" 
+                  onClick={() => alert("Add to Queue logic coming soon!")} 
+                  title="Play Next in Queue"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="4" y1="6" x2="20" y2="6"></line>
+                    <line x1="4" y1="12" x2="20" y2="12"></line>
+                    <line x1="4" y1="18" x2="11" y2="18"></line>
+                    <polyline points="15 15 18 18 15 21"></polyline>
+                    <line x1="11" y1="18" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+                
               </div>
               
               <div className="detail-progress-container">
