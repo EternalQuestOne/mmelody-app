@@ -581,3 +581,30 @@ body {
   animation: pulse 1s infinite alternate;
   font-size: 2.5rem;
 }
+
+/* --- STANDALONE CREATE PLAYLIST ROW --- */
+.create-standalone-playlist {
+  display: flex;
+  gap: 10px;
+  padding: 0 15px;
+  margin-top: 15px;
+  margin-bottom: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.standalone-playlist-input {
+  flex: 1;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #fff;
+  padding: 12px 16px;
+  border-radius: 8px;
+  outline: none;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+}
+
+.standalone-playlist-input:focus {
+  border-color: #56CCF2;
+}

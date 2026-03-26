@@ -727,14 +727,25 @@ function App() {
 
         {/* NEW: THE PLAYLISTS TAB UI */}
         {activeTab === 'playlists' && (
-          <div className="app-container">
-            <header className="header attractive-header">
+          <header className="header attractive-header">
               <div className="header-bg-glow"></div>
               <h2>My Playlists</h2>
             </header>
             
             {/* Hidden file input specifically for playlist covers */}
             <input type="file" accept="image/*" ref={playlistFileInputRef} onChange={handlePlaylistCoverUpload} style={{ display: 'none' }} />
+
+            {/* NEW: Standalone Create Playlist Row */}
+            <div className="create-standalone-playlist">
+              <input 
+                type="text" 
+                placeholder="Name your new playlist..." 
+                value={newPlaylistName}
+                onChange={(e) => setNewPlaylistName(e.target.value)}
+                className="standalone-playlist-input"
+              />
+              <button className="create-btn" onClick={handleCreatePlaylist}>Create</button>
+            </div>
 
             <div className="playlists-grid">
               {playlists.length === 0 ? (
