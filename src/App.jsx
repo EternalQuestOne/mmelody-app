@@ -249,14 +249,14 @@ function App() {
                   const blob = new Blob([byteArray], { type: tags.picture.format });
                   const imgFormData = new FormData();
                   imgFormData.append('file', blob);
-                  imgFormData.append('upload_preset', 'mmelody_preset');
+                  imgFormData.append('upload_preset', 'mMelody_preset');
                   const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: imgFormData });
                   coverUrl = (await imgRes.json()).secure_url;
                 }
 
                 const audioFormData = new FormData();
                 audioFormData.append('file', file);
-                audioFormData.append('upload_preset', 'mmelody_preset');
+                audioFormData.append('upload_preset', 'mMelody_preset');
                 const audioRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/video/upload`, { method: 'POST', body: audioFormData });
                 const audioUrl = (await audioRes.json()).secure_url;
 
@@ -419,7 +419,7 @@ function App() {
               <div className="header-bg-glow"></div>
               {/* NEW: Updated structure to hold logo and text together */}
               <div className="brand-header-wrapper">
-                  <img src={logoImage} alt="Mmelody logo" className="app-logo" />
+                  <img src={logoImage} alt="mMelody logo" className="app-logo" />
                   <h3>mMelody</h3>
               </div>
               
