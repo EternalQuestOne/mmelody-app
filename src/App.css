@@ -294,8 +294,22 @@ body {
 .more-details-btn:hover { background-color: rgba(255,255,255,0.05); }
 .more-details-content { margin-top: 20px; animation: fadeIn 0.3s ease; }
 .tag-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
-.tag-item { font-size: 0.9rem; color: #ddd; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; }
-.tag-item span { color: #56CCF2; display: block; font-size: 0.95rem; margin-bottom: 2px; }
+.tag-item { 
+  font-size: 0.8rem; /* Decreased from 0.9rem to shrink the actual data values */
+  color: #ddd; 
+  background: rgba(255,255,255,0.05); 
+  padding: 10px; 
+  border-radius: 8px; 
+}
+.tag-item span { 
+  color: #56CCF2; 
+  display: block; 
+  font-size: 0.75rem; /* Shrunk slightly to maintain the visual hierarchy */
+  margin-bottom: 3px; 
+  font-weight: 700; /* CRITICAL: Makes the label bold */
+  text-transform: uppercase; /* Optional: Makes it look even cleaner, like a native app label */
+  letter-spacing: 0.5px; /* Gives the bold letters a tiny bit of breathing room */
+}
 .lyrics-box { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; }
 .lyrics-box h4 { margin: 0 0 15px 0; color: #56CCF2; } 
 .lyrics-box p { white-space: pre-wrap; color: #ddd; line-height: 1.6; font-size: 1.25rem; margin: 0; }
