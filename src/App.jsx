@@ -212,6 +212,15 @@ function App() {
 
   const handleSeekBackward = () => { if (audioRef.current) audioRef.current.currentTime -= 10; }
   const handleSeekForward = () => { if (audioRef.current) audioRef.current.currentTime += 10; }
+  const handleSeek = (e) => {
+    const seekPercentage = parseFloat(e.target.value);
+    if (audioRef.current && audioRef.current.duration) {
+      // Calculate the exact second in the song based on the percentage swiped
+      const newTime = (seekPercentage / 100) * audioRef.current.duration;
+      audioRef.current.currentTime = newTime;
+      setProgress(seekPercentage);
+    }
+  }
 
   const handleToggleFavorite = async () => {
     if (!currentSong) return;
@@ -406,14 +415,26 @@ function App() {
               </div>
               
               <div className="detail-progress-container">
-                <div className="progress-bar-bg">
-                  <div className="progress-bar-fill" style={{ width: `${progress}%` }}></div>
-                </div>
-                <div className="time-row">
-                  <span>{currentTimeFormatted}</span>
-                  <span>{currentSong.duration || '0:00'}</span>
-                </div>
-              </div>
+                <div className="progress-bar-bg" style={{ position: 'relative' }}>
+                  <div className="progress-bar-fill" style={{ width: `${progress}%` }}></div>
+                  
+                  {/* NEW: The invisible scrubber overlaid on top */}
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="100" 
+                    step="0.1"
+                    value={progress || 0} 
+                    onChange={handleSeek}
+                    className="progress-scrubber"
+                  />
+                </div>
+                
+                <div className="time-row">
+                  <span>{currentTimeFormatted}</span>
+                  <span>{currentSong.duration || '0:00'}</span>
+                </div>
+              </div>
 
               <div className="detail-playback-controls-bar">
                 <button className="pro-ctrl-btn" onClick={handleSeekBackward}>
