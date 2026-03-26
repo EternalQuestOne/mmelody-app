@@ -249,9 +249,21 @@ body {
   margin-bottom: 5px; /* Significantly reduced gap below controls */
 }
 
-.pro-ctrl-btn { background: transparent; border: none; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: transform 0.2s, background-color 0.2s; padding: 10px; }
-.pro-ctrl-btn:active { transform: scale(0.95); }
-.pro-ctrl-btn:hover { background-color: rgba(255,255,255,0.05); }
+.pro-ctrl-btn { 
+  background: transparent; 
+  border: none; 
+  color: #fff; 
+  cursor: pointer; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  border-radius: 50%; 
+  transition: transform 0.2s, background-color 0.2s; 
+  padding: 10px; 
+  flex-shrink: 0; 
+  -webkit-tap-highlight-color: transparent; /* CRITICAL: Kills the mobile tap square */
+  outline: none; /* CRITICAL: Kills the desktop focus square */
+}
 
 .master-play-pause-btn { 
   width: 45px; 
