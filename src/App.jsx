@@ -735,11 +735,6 @@ function App() {
               {sortedPlaylists.length === 0 ? (
                 <div className="empty-state"><h3>No Playlists</h3><p>Create one by typing a name above!</p></div>
               ) : (
-                /* CRITICAL: Changed from playlists.map to sortedPlaylists.map */
-                sortedPlaylists.map((playlist, index) => (
-                  <div key={playlist.id} className="playlist-list-item" onClick={() => alert("Opening playlist songs logic coming next!")}>
-                <div className="empty-state"><h3>No Playlists</h3><p>Create one by typing a name above!</p></div>
-              ) : (
                 sortedPlaylists.map((playlist, index) => (
                   <div key={playlist.id} className="playlist-list-item" onClick={() => alert("Opening playlist songs logic coming next!")}>
                     
@@ -760,7 +755,7 @@ function App() {
                     <div className="menu-container">
                       <button className="menu-btn" onClick={(e) => toggleMenu(e, `pl-${playlist.id}`)}>⋮</button>
                       {activeMenu === `pl-${playlist.id}` && (
-                        <div className={`dropdown-menu ${index >= playlists.length - 3 ? 'dropdown-upward' : ''}`} style={{ right: '0' }}>
+                        <div className={`dropdown-menu ${index >= sortedPlaylists.length - 3 ? 'dropdown-upward' : ''}`} style={{ right: '0' }}>
                           <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); triggerPlaylistCoverUpload(playlist.id); }}>
                             🖼 {playlist.cover_url ? 'Change Art' : 'Add Art'}
                           </div>
