@@ -245,16 +245,35 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 20px;
-  margin-bottom: 20px; /* Reduced from 40px */
+  gap: 12px; /* Squeezed slightly to fit the new button perfectly */
+  margin-bottom: 20px; 
 }
 
 .pro-ctrl-btn { background: transparent; border: none; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: transform 0.2s, background-color 0.2s; padding: 10px; }
 .pro-ctrl-btn:active { transform: scale(0.95); }
 .pro-ctrl-btn:hover { background-color: rgba(255,255,255,0.05); }
 
-.master-play-pause-btn { width: 72px; height: 72px; background-color: #2F80ED; color: #ffffff; box-shadow: 0 8px 24px rgba(47, 128, 237, 0.4); }
+.master-play-pause-btn { 
+  width: 60px; /* Reduced from 72px */
+  height: 60px; /* Reduced from 72px */
+  background-color: #2F80ED; 
+  color: #ffffff; 
+  box-shadow: 0 8px 24px rgba(47, 128, 237, 0.4); 
+}
 .master-play-pause-btn:hover { background-color: #56CCF2; color: #000; transform: scale(1.04); }
+
+/* NEW: The Stop Button Styling */
+.master-stop-btn { 
+  width: 45px; 
+  height: 45px; 
+  background-color: rgba(224, 36, 94, 0.1); /* Subtle red tinted background */
+  color: #E0245E; /* Vibrant red icon */
+}
+.master-stop-btn:hover { 
+  background-color: #E0245E; 
+  color: #ffffff; 
+  transform: scale(1.04); 
+}
 
 .more-details-wrapper { margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; }
 .more-details-btn { width: 100%; background-color: transparent; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 12px; border-radius: 20px; font-size: 1rem; cursor: pointer; transition: background-color 0.2s; }
