@@ -54,6 +54,12 @@ function App() {
   const [uploadProgressText, setUploadProgressText] = useState('')
   const [showMoreDetails, setShowMoreDetails] = useState(false) 
   const [activeMenu, setActiveMenu] = useState(null)
+  
+  // NEW: Playlist State Variables
+  const [playlists, setPlaylists] = useState([]);
+  const [showPlaylistModal, setShowPlaylistModal] = useState(false);
+  const [songForPlaylist, setSongForPlaylist] = useState(null);
+  const [newPlaylistName, setNewPlaylistName] = useState('');
 
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -88,12 +94,49 @@ function App() {
     navigateTo(tab);
   };
 
-  useEffect(() => { getSongs() }, [])
+  useEffect(() => { 
+    getSongs();
+    getPlaylists(); // NEW: Fetch playlists when app loads
+  }, [])
 
   async function getSongs() {
-    const { data } = await supabase.from('songs').select('*').order('created_at', { ascending: false })
-    if (data) setSongs(data)
-  }
+    const { data } = await supabase.from('songs').select('*').order('created_at', { ascending: false })
+    if (data) setSongs(data)
+  }
+
+  // NEW: Fetch Playlists function
+  async function getPlaylists() {
+    const { data } = await supabase.from('playlists').select('*').order('created_at', { ascending: false })
+    if (data) setPlaylists(data)
+  }
+
+  const handleOpenPlaylistModal = (song) => {
+    setSongForPlaylist(song);
+    setShowPlaylistModal(true);
+    setActiveMenu(null); 
+  };
+
+  const handleCreatePlaylist = async () => {
+    if (!newPlaylistName.trim()) return;
+    const { data, error } = await supabase.from('playlists').insert([{ name: newPlaylistName }]).select();
+    if (data) {
+      setPlaylists([data[0], ...playlists]);
+      setNewPlaylistName('');
+      if (songForPlaylist) await handleAddSongToPlaylist(data[0].id, songForPlaylist.id);
+    }
+  };
+
+  const handleAddSongToPlaylist = async (playlistId, songId) => {
+    // Insert into the junction table
+    const { error } = await supabase.from('playlist_songs').insert([{ playlist_id: playlistId, song_id: songId }]);
+    
+    if (error && error.code !== '23505') { // 23505 is the error code if the song is already in the playlist
+      console.error("Error adding to playlist:", error);
+    } else {
+      setShowPlaylistModal(false);
+      setSongForPlaylist(null);
+    }
+  };
 
   // NEW: Permanent multi-file deletion handler
   const handleDeleteSelected = async () => {
@@ -240,8 +283,6 @@ function App() {
     }, 100);
   }
 
-  const handleAddToPlaylistDetailed = () => { if (currentSong) alert("Open Playlist Selector! (Architecture coming next)"); }
-
   const toggleMenu = (e, songId) => {
     e.stopPropagation(); 
     setActiveMenu(activeMenu === songId ? null : songId);
@@ -363,6 +404,43 @@ function App() {
                   <span className="scroll-title">{currentSong.title || 'Unknown Title'}</span>
                   {currentSong.artist && <span className="scroll-artist"> • {currentSong.artist}</span>}
                 </div>
+                {/* THE PLAYLIST SELECTION MODAL */}
+      {showPlaylistModal && (
+        <div className="modal-overlay" onClick={() => setShowPlaylistModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Add to Playlist</h3>
+              <button className="close-modal" onClick={() => setShowPlaylistModal(false)}>×</button>
+            </div>
+            
+            <div className="create-playlist-row">
+              <input 
+                type="text" 
+                placeholder="New playlist name..." 
+                value={newPlaylistName}
+                onChange={(e) => setNewPlaylistName(e.target.value)}
+              />
+              <button className="create-btn" onClick={handleCreatePlaylist}>Create</button>
+            </div>
+
+            <div className="playlist-options">
+              {playlists.length === 0 ? (
+                <p className="no-playlists-text">No playlists yet. Create one above!</p>
+              ) : (
+                playlists.map(pl => (
+                  <div key={pl.id} className="playlist-option-row" onClick={() => handleAddSongToPlaylist(pl.id, songForPlaylist.id)}>
+                    <div className="pl-art-mini">
+                      {pl.cover_url ? <img src={pl.cover_url} alt="cover" /> : '💽'}
+                    </div>
+                    <span className="pl-name">{pl.name}</span>
+                    <span className="pl-add-icon">+</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
               </div>
 
               <div className="detail-interaction-row">
@@ -388,7 +466,8 @@ function App() {
                 </button>
 
                 {/* 3rd Button: Playlist */}
-                <button className="detail-inter-btn" onClick={handleAddToPlaylistDetailed}>
+                {/* 3rd Button: Playlist */}
+                <button className="detail-inter-btn" onClick={() => handleOpenPlaylistModal(currentSong)}>
                   <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zM2 16h8v-2H2v2zm14-1v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4z"/>
                   </svg>
@@ -596,7 +675,7 @@ function App() {
                               <div className="dropdown-item" onClick={(e) => handleGoToDetails(e, song)}>📄 Go to Details</div>
                               <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); alert("Added to queue!"); }}>⏮ Add to Queue</div>
                               <div className="dropdown-item" onClick={handleToggleFavorite}>❤️ {currentSong.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div>
-                              <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); alert("Ready to build Playlists!"); }}>💽 Add to Playlist</div>
+                              <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); handleOpenPlaylistModal(song); }}>💽 Add to Playlist</div>
                               {/* NEW: Singular Delete in Menu */}
                               <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={() => { setSelectedIds([song.id]); handleDeleteSelected(); }}>🗑 Delete Song</div>
                             </div>
