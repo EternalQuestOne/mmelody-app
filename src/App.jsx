@@ -39,6 +39,7 @@ function App() {
   const [currentSong, setCurrentSong] = useState(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [isShuffle, setIsShuffle] = useState(false);
   
   // NEW: Selection & Sorting State
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -177,11 +178,20 @@ function App() {
   }
 
   const handleNextSong = () => {
-    if (!sortedSongs.length || !currentSong) return;
-    const currentIndex = sortedSongs.findIndex(s => s.audio_url === currentSong.audio_url);
-    if (currentIndex > 0) { handlePlayPause(sortedSongs[currentIndex - 1]); }
-    else { handlePlayPause(sortedSongs[sortedSongs.length - 1]); }
-  }
+    if (!sortedSongs.length || !currentSong) return;
+
+    // NEW: If shuffle is ON, pick a completely random song
+    if (isShuffle) {
+      const randomIndex = Math.floor(Math.random() * sortedSongs.length);
+      handlePlayPause(sortedSongs[randomIndex]);
+      return; 
+    }
+
+    // Standard Next Song Logic
+    const currentIndex = sortedSongs.findIndex(s => s.audio_url === currentSong.audio_url);
+    if (currentIndex > 0) { handlePlayPause(sortedSongs[currentIndex - 1]); }
+    else { handlePlayPause(sortedSongs[sortedSongs.length - 1]); }
+  }
 
   const handleSeekBackward = () => { if (audioRef.current) audioRef.current.currentTime -= 10; }
   const handleSeekForward = () => { if (audioRef.current) audioRef.current.currentTime += 10; }
@@ -330,27 +340,36 @@ function App() {
               </div>
 
               <div className="detail-interaction-row">
-                <button className={`detail-inter-btn ${currentSong.is_favorite ? 'favorite-filled' : ''}`} onClick={handleToggleFavorite}>
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill={currentSong.is_favorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-                </button>
-                
-                <button className="detail-inter-btn" onClick={handleOpenInfo}>
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-                  </svg>
-                </button>
-
-                <button className="detail-inter-btn" onClick={handleAddToPlaylistDetailed}>
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zM2 16h8v-2H2v2zm14-1v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4z"/>
-                  </svg>
-                </button>
-
-                <button 
-                  className="detail-inter-btn" 
-                  onClick={() => alert("Add to Queue logic coming soon!")} 
-                  title="Play Next in Queue"
+                
+                {/* 1st Button: Shuffle Toggle */}
+                <button 
+                  className={`detail-inter-btn ${isShuffle ? 'active-info' : ''}`} 
+                  onClick={() => setIsShuffle(!isShuffle)} 
+                  title="Toggle Shuffle"
                 >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="16 3 21 3 21 8"></polyline>
+                    <line x1="4" y1="20" x2="21" y2="3"></line>
+                    <polyline points="21 16 21 21 16 21"></polyline>
+                    <line x1="15" y1="15" x2="21" y2="21"></line>
+                    <line x1="4" y1="4" x2="9" y2="9"></line>
+                  </svg>
+                </button>
+
+                {/* 2nd Button: Favorite */}
+                <button className={`detail-inter-btn ${currentSong.is_favorite ? 'favorite-filled' : ''}`} onClick={handleToggleFavorite}>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill={currentSong.is_favorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                </button>
+
+                {/* 3rd Button: Playlist */}
+                <button className="detail-inter-btn" onClick={handleAddToPlaylistDetailed}>
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zM2 16h8v-2H2v2zm14-1v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4z"/>
+                  </svg>
+                </button>
+
+                {/* 4th Button: Add to Queue */}
+                <button className="detail-inter-btn" onClick={() => alert("Add to Queue logic coming soon!")} title="Play Next in Queue">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="4" y1="6" x2="20" y2="6"></line>
                     <line x1="4" y1="12" x2="20" y2="12"></line>
@@ -360,7 +379,14 @@ function App() {
                   </svg>
                 </button>
                 
-              </div>
+                {/* 5th Button: Info (Moved to standard far-right position) */}
+                <button className={`detail-inter-btn ${showDetails ? 'active-info' : ''}`} onClick={handleOpenInfo}>
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                  </svg>
+                </button>
+
+              </div>
               
               <div className="detail-progress-container">
                 <div className="progress-bar-bg">
