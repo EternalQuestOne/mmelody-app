@@ -107,9 +107,22 @@ body {
 
 .list-info { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; text-align: left; margin-right: 10px; }
 .list-title { font-size: 0.85rem; margin-bottom: 4px; font-weight: 500; }
-.list-subtitle { color: #999; font-size: 0.85rem; }
+.list-subtitle { 
+  color: #999; 
+  font-size: 0.85rem; 
+  display: flex; 
+  flex-direction: column; /* Forces the line break */
+  align-items: flex-start; /* Keeps the artist name aligned to the left */
+  width: 100%;
+}
 
-.list-time-counter { color: #56CCF2; font-weight: 500; font-variant-numeric: tabular-nums; }
+.list-time-counter { 
+  color: #56CCF2; 
+  font-weight: 500; 
+  font-variant-numeric: tabular-nums; 
+  align-self: center; /* Centers the counter on its new line */
+  margin-top: 4px; /* Adds a tiny bit of breathing room above it */
+}
 .list-progress-bar { width: 100%; height: 3px; background-color: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 6px; overflow: hidden; }
 .list-progress-fill { height: 100%; background-color: #56CCF2; }
 

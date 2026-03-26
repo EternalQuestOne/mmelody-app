@@ -484,7 +484,7 @@ function App() {
                           {song.artist && <span>{song.artist}</span>}
                           {isThisPlaying && (
                             <span className="list-time-counter">
-                              {song.artist ? ' • ' : ''}{currentTimeFormatted} / {song.duration || '0:00'}
+                              {currentTimeFormatted} / {song.duration || '0:00'}
                             </span>
                           )}
                         </div>
