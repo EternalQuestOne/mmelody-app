@@ -203,13 +203,7 @@ function App() {
     }
   }
 
-    // Standard Next Song Logic
-    const currentIndex = sortedSongs.findIndex(s => s.audio_url === currentSong.audio_url);
-    if (currentIndex > 0) { handlePlayPause(sortedSongs[currentIndex - 1]); }
-    else { handlePlayPause(sortedSongs[sortedSongs.length - 1]); }
-  }
-
-  const handleSeekBackward = () => { if (audioRef.current) audioRef.current.currentTime -= 10; }
+  const handleSeekBackward = () => { if (audioRef.current) audioRef.current.currentTime -= 10; }
   const handleSeekForward = () => { if (audioRef.current) audioRef.current.currentTime += 10; }
 
   const handleToggleFavorite = async () => {
