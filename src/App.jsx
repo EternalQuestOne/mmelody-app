@@ -726,8 +726,10 @@ function App() {
         )}
 
         {/* NEW: THE PLAYLISTS TAB UI */}
+        {/* NEW: THE PLAYLISTS TAB UI */}
         {activeTab === 'playlists' && (
-          <header className="header attractive-header">
+          <div className="app-container">
+            <header className="header attractive-header">
               <div className="header-bg-glow"></div>
               <h2>My Playlists</h2>
             </header>
@@ -754,7 +756,7 @@ function App() {
                 playlists.map(playlist => (
                   <div key={playlist.id} className="playlist-card" onClick={() => alert("Opening playlist songs logic coming next!")}>
                     <div className="playlist-art-wrapper">
-                      {/* NEW: Shows a loading pulse while uploading this specific cover */}
+                      {/* Shows a loading pulse while uploading this specific cover */}
                       {isUploading && editingPlaylistId === playlist.id ? (
                         <div className="playlist-art-placeholder spinner-pulse">⏳</div>
                       ) : playlist.cover_url ? (
@@ -764,7 +766,7 @@ function App() {
                       )}
                     </div>
                     
-                    {/* NEW: Info row with 3-dot menu instead of sticky hover */}
+                    {/* Info row with 3-dot menu instead of sticky hover */}
                     <div className="playlist-card-info">
                       <div className="playlist-card-name">{playlist.name}</div>
                       
