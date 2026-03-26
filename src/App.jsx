@@ -139,6 +139,70 @@ function App() {
     }
   };
 
+  // --- NEW: PLAYLIST COVER ART LOGIC ---
+  const playlistFileInputRef = useRef(null);
+  const [editingPlaylistId, setEditingPlaylistId] = useState(null);
+
+  const triggerPlaylistCoverUpload = (playlistId) => {
+    setEditingPlaylistId(playlistId);
+    playlistFileInputRef.current.click();
+  };
+
+  const handlePlaylistCoverUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file || !editingPlaylistId) return;
+
+    setIsUploading(true);
+    setUploadProgressText("Updating cover...");
+
+    try {
+      // 1. Check if the playlist already has a cover, and delete the old one from Cloudinary to save space!
+      const playlist = playlists.find(p => p.id === editingPlaylistId);
+      if (playlist && playlist.cover_url) {
+        const oldCoverId = extractPublicId(playlist.cover_url);
+        if (oldCoverId) await fetch('/api/deleteImage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ public_id: oldCoverId })});
+      }
+
+      // 2. Upload the new cover
+      const imgFormData = new FormData();
+      imgFormData.append('file', file);
+      imgFormData.append('upload_preset', 'mMelody_preset'); // Make sure this matches your Cloudinary preset!
+      const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: imgFormData });
+      const newCoverUrl = (await imgRes.json()).secure_url;
+
+      // 3. Update the Supabase database
+      const { data } = await supabase.from('playlists').update({ cover_url: newCoverUrl }).eq('id', editingPlaylistId).select();
+      if (data) {
+        setPlaylists(playlists.map(p => p.id === editingPlaylistId ? data[0] : p));
+      }
+    } catch (err) { console.error("Cover update error:", err); } 
+    finally {
+      setIsUploading(false);
+      setUploadProgressText('');
+      setEditingPlaylistId(null);
+      event.target.value = null;
+    }
+  };
+
+  const handleDeletePlaylistCover = async (e, playlist) => {
+    e.stopPropagation();
+    if (!window.confirm("Remove this custom cover art?")) return;
+    
+    setIsUploading(true);
+    setUploadProgressText("Removing cover...");
+
+    try {
+      const coverId = extractPublicId(playlist.cover_url);
+      if (coverId) await fetch('/api/deleteImage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ public_id: coverId })});
+
+      const { data } = await supabase.from('playlists').update({ cover_url: null }).eq('id', playlist.id).select();
+      if (data) {
+        setPlaylists(playlists.map(p => p.id === playlist.id ? data[0] : p));
+      }
+    } catch (err) { console.error("Cover delete error:", err); } 
+    finally { setIsUploading(false); setUploadProgressText(''); }
+  };
+
   // NEW: Permanent multi-file deletion handler
   const handleDeleteSelected = async () => {
     if (selectedIds.length === 0) return;
@@ -661,7 +725,50 @@ function App() {
           </div>
         )}
 
-        {['queue', 'albums', 'artists', 'playlists'].includes(activeTab) && (
+        {/* NEW: THE PLAYLISTS TAB UI */}
+        {activeTab === 'playlists' && (
+          <div className="app-container">
+            <header className="header attractive-header">
+              <div className="header-bg-glow"></div>
+              <h2>My Playlists</h2>
+            </header>
+            
+            {/* Hidden file input specifically for playlist covers */}
+            <input type="file" accept="image/*" ref={playlistFileInputRef} onChange={handlePlaylistCoverUpload} style={{ display: 'none' }} />
+
+            <div className="playlists-grid">
+              {playlists.length === 0 ? (
+                <div className="empty-state"><h3>No Playlists</h3><p>Create one by clicking the Playlist icon on any song!</p></div>
+              ) : (
+                playlists.map(playlist => (
+                  <div key={playlist.id} className="playlist-card" onClick={() => alert("Opening playlist songs logic coming next!")}>
+                    <div className="playlist-art-wrapper">
+                      {playlist.cover_url ? (
+                        <img src={playlist.cover_url} alt={playlist.name} className="playlist-art-img" />
+                      ) : (
+                        <div className="playlist-art-placeholder">💽</div>
+                      )}
+                      
+                      {/* The Hover/Edit Overlay */}
+                      <div className="playlist-art-overlay">
+                        <button className="edit-art-btn" onClick={(e) => { e.stopPropagation(); triggerPlaylistCoverUpload(playlist.id); }}>
+                          {playlist.cover_url ? 'Change Art' : 'Add Art'}
+                        </button>
+                        {playlist.cover_url && (
+                          <button className="delete-art-btn" onClick={(e) => handleDeletePlaylistCover(e, playlist)}>Remove</button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="playlist-card-name">{playlist.name}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Updated Placeholder: Removed 'playlists' from the list */}
+        {['queue', 'albums', 'artists'].includes(activeTab) && (
           <div className="empty-state"><h3>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h3><p>This architecture is coming soon!</p></div>
         )}
       </div>

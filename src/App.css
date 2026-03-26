@@ -464,3 +464,101 @@ body {
 .pl-name { flex: 1; color: #fff; font-size: 0.95rem; font-weight: 500; }
 .pl-add-icon { color: #56CCF2; font-size: 1.2rem; font-weight: bold; }
 .no-playlists-text { color: #888; text-align: center; font-size: 0.9rem; padding: 20px 0; }
+
+/* --- PLAYLISTS GRID UI --- */
+.playlists-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+  padding: 15px;
+  margin-bottom: 30px;
+}
+
+.playlist-card {
+  background: rgba(255,255,255,0.03);
+  border-radius: 12px;
+  padding: 10px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.2s, background 0.2s;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.playlist-card:hover {
+  background: rgba(255,255,255,0.08);
+  transform: translateY(-2px);
+}
+
+.playlist-art-wrapper {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 10px;
+  position: relative;
+  background: #1a1a1a;
+}
+
+.playlist-art-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.playlist-art-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 3rem;
+}
+
+/* The dark overlay that appears so you can click the edit buttons */
+.playlist-art-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  opacity: 0; /* Hidden by default */
+  transition: opacity 0.2s;
+}
+
+/* Show the overlay when hovering over the card */
+.playlist-card:hover .playlist-art-overlay {
+  opacity: 1;
+}
+
+.edit-art-btn {
+  background: #56CCF2;
+  color: #000;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 15px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.delete-art-btn {
+  background: transparent;
+  color: #ff4d4d;
+  border: 1px solid #ff4d4d;
+  padding: 6px 12px;
+  border-radius: 15px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.playlist-card-name {
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
