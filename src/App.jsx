@@ -330,9 +330,23 @@ function App() {
               </div>
 
               <div className="detail-interaction-row">
-                <button className={`detail-inter-btn ${currentSong.is_favorite ? 'favorite-filled' : ''}`} onClick={handleToggleFavorite}>
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill={currentSong.is_favorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-                </button>
+                {/* 4th Button: Add to Queue (List with Right Arrow) */}
+                <button 
+                  className="detail-inter-btn" 
+                  onClick={() => alert("Add to Queue logic coming soon!")} 
+                  title="Play Next in Queue"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    {/* The top two horizontal lines of the list */}
+                    <line x1="4" y1="6" x2="20" y2="6"></line>
+                    <line x1="4" y1="12" x2="20" y2="12"></line>
+                    {/* The shortened bottom line */}
+                    <line x1="4" y1="18" x2="11" y2="18"></line>
+                    {/* The right-pointing arrow */}
+                    <polyline points="15 15 18 18 15 21"></polyline>
+                    <line x1="11" y1="18" x2="18" y2="18"></line>
+                  </svg>
+                </button>
                 
                 <button className="detail-inter-btn" onClick={handleOpenInfo}>
                   <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
