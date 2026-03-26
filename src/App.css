@@ -56,8 +56,8 @@ body {
 }
 
 .app-logo {
-  width: 45px;  /* <-- CHANGE THIS NUMBER to make it wider */
-  height: 45px; /* <-- CHANGE THIS NUMBER to make it taller (keep them equal!) */
+  width: 60px;  /* <-- CHANGE THIS NUMBER to make it wider */
+  height: 60px; /* <-- CHANGE THIS NUMBER to make it taller (keep them equal!) */
   flex-shrink: 0;
   border-radius: 50%; /* Optional: rounds the hard edges of the image if it has a background */
 }
