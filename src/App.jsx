@@ -54,6 +54,7 @@ function App() {
   
   // Playlist State Variables
   const [playlists, setPlaylists] = useState([]);
+  const [playlistSortOrder, setPlaylistSortOrder] = useState('newest'); // NEW: Playlist Sorting
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [songForPlaylist, setSongForPlaylist] = useState(null);
   const [newPlaylistName, setNewPlaylistName] = useState('');
@@ -281,6 +282,13 @@ function App() {
     if (sortOrder === 'za') return (b.title || '').localeCompare(a.title || '');
     if (sortOrder === 'oldest') return new Date(a.created_at) - new Date(b.created_at);
     return new Date(b.created_at) - new Date(a.created_at);
+  });
+  // NEW: Sorting logic applied to the playlists array
+  const sortedPlaylists = [...playlists].sort((a, b) => {
+    if (playlistSortOrder === 'az') return (a.name || '').localeCompare(b.name || '');
+    if (playlistSortOrder === 'za') return (b.name || '').localeCompare(a.name || '');
+    if (playlistSortOrder === 'oldest') return new Date(a.created_at) - new Date(b.created_at);
+    return new Date(b.created_at) - new Date(a.created_at); // default/newest
   });
 
   const handlePreviousSong = () => {
@@ -713,8 +721,23 @@ function App() {
               <button className="create-btn" onClick={handleCreatePlaylist}>Create</button>
             </div>
 
+            {/* NEW: Playlist Sorting Dropdown */}
+            <div className="selection-toolbar" style={{ padding: '0 15px', marginTop: '-10px', marginBottom: '15px', justifyContent: 'flex-end' }}>
+              <select className="sort-select" value={playlistSortOrder} onChange={(e) => setPlaylistSortOrder(e.target.value)}>
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="az">A-Z (Name)</option>
+                <option value="za">Z-A (Name)</option>
+              </select>
+            </div>
+
             <div className="playlists-list-view">
-              {playlists.length === 0 ? (
+              {sortedPlaylists.length === 0 ? (
+                <div className="empty-state"><h3>No Playlists</h3><p>Create one by typing a name above!</p></div>
+              ) : (
+                /* CRITICAL: Changed from playlists.map to sortedPlaylists.map */
+                sortedPlaylists.map((playlist, index) => (
+                  <div key={playlist.id} className="playlist-list-item" onClick={() => alert("Opening playlist songs logic coming next!")}>
                 <div className="empty-state"><h3>No Playlists</h3><p>Create one by typing a name above!</p></div>
               ) : (
                 playlists.map((playlist, index) => (
