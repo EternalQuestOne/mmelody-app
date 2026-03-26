@@ -467,19 +467,29 @@ body {
 
 /* --- PLAYLISTS TAB SPECIFIC HEADER --- */
 .ocean-header {
-  padding: 15px 20px; /* Narrower ribbon */
-  border-bottom: 1px solid rgba(0, 150, 255, 0.2);
-  background: rgba(4, 20, 35, 0.95); /* Deep ocean background */
+  width: max-content; /* CRITICAL: Shrinks the header to wrap the text perfectly */
+  margin: 15px auto 25px auto; /* Centers it and gives it breathing room */
+  padding: 10px 35px; 
+  background: rgba(255, 255, 255, 0.05); /* Deep dark theme background */
+  border: 1px solid rgba(86, 204, 242, 0.3); /* Subtle neon blue border */
+  border-radius: 30px; /* Makes it a beautiful floating pill */
+  border-bottom: 1px solid rgba(86, 204, 242, 0.3); /* Overrides default header border */
+  position: relative;
+  top: 10px; 
 }
+
 .ocean-glow {
-  background: #00B4DB; /* Ocean bright blue glow */
-  opacity: 0.25;
+  background: #56CCF2; /* Matches your app's core neon blue */
+  opacity: 0.2;
+  width: 120px;
+  height: 40px;
 }
+
 .ocean-title {
   margin: 0;
-  font-size: 1.4rem; /* Neater, tighter font size */
+  font-size: 1.25rem; 
   font-weight: 700;
-  color: #ffffff;
+  color: #fff;
   text-align: center;
   letter-spacing: 0.5px;
 }
