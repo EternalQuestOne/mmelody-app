@@ -469,12 +469,9 @@ function App() {
                 const isSelected = selectedIds.includes(song.id); // NEW: Check if selected
 
                 return (
-                  {/* NEW: Apply special class to selected rows */}
-                  <div key={uniqueId} className={`list-item ${isThisPlaying ? 'active' : ''} ${isSelected ? 'selected-row' : ''}`}>
-                    {/* NEW: Selection mode logic updates the click handler and handle display */}
-                    <div className="list-clickable-area" onClick={() => isSelectionMode ? toggleSelection(song.id) : handlePlayPause(song)}>
-                      {isSelectionMode ? (
-                        {/* NEW: Custom Checkbox UI */}
+                  <div key={uniqueId} className={`list-item ${isThisPlaying ? 'active' : ''} ${isSelected ? 'selected-row' : ''}`}>
+                    <div className="list-clickable-area" onClick={() => isSelectionMode ? toggleSelection(song.id) : handlePlayPause(song)}>
+                      {isSelectionMode ? (
                         <div className={`custom-checkbox ${isSelected ? 'checked' : ''}`}></div>
                       ) : (
                         <div className="drag-handle">=</div>
