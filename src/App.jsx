@@ -1,569 +1,405 @@
-import { useState, useEffect, useRef } from 'react'
-import { supabase } from './supabaseClient'
-import jsmediatags from 'jsmediatags/dist/jsmediatags.min.js'
-import './App.css'
-
-// NEW: Importing your generated energetic logo asset!
-import logoImage from './logo.png' // Save image_0.png as logo.png in your src folder
-
-const CLOUDINARY_CLOUD_NAME = 'dexx3rdkl';
-
-const extractTagText = (frame) => {
-  if (!frame) return '';
-  if (typeof frame === 'string') return frame;
-  if (frame.data) {
-    if (typeof frame.data === 'string') return frame.data;
-    if (typeof frame.data.text === 'string') return frame.data.text;
-    if (typeof frame.data.lyrics === 'string') return frame.data.lyrics;
-    if (typeof frame.data.description === 'string') return frame.data.description;
-  }
-  return '';
+/* --- Core Styling --- */
+body {
+  background-color: #000000;
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
 }
 
-// NEW: Helper to extract Cloudinary public IDs for deletion
-const extractPublicId = (url) => {
-  try {
-    const parts = url.split('/upload/');
-    if (parts.length !== 2) return null;
-    let path = parts[1];
-    // Remove versioning (e.g., v1678901234/) if present
-    if (/^v\d+\//.test(path)) path = path.replace(/^v\d+\//, '');
-    const lastDot = path.lastIndexOf('.');
-    return lastDot !== -1 ? path.substring(0, lastDot) : path;
-  } catch (e) { return null; }
-};
-
-function App() {
-  const [songs, setSongs] = useState([])
-  const [searchTerm, setSearchTerm] = useState('')
-  const [currentSong, setCurrentSong] = useState(null)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
-  
-  // NEW: Selection & Sorting State
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState([]);
-  const [sortOrder, setSortOrder] = useState('newest'); // Options: newest, oldest, az, za
-
-  const [activeTab, setActiveTab] = useState('list') 
-  const [showSearch, setShowSearch] = useState(false) 
-  
-  const [progress, setProgress] = useState(0)
-  const [currentTimeFormatted, setCurrentTimeFormatted] = useState('0:00')
-  const [uploadProgressText, setUploadProgressText] = useState('')
-  const [showMoreDetails, setShowMoreDetails] = useState(false) 
-  const [activeMenu, setActiveMenu] = useState(null)
-
-  const audioRef = useRef(null)
-  const fileInputRef = useRef(null)
-  
-  // NEW: Reference to the "More Details" section so we can scroll to it
-  const moreDetailsRef = useRef(null)
-
-  useEffect(() => {
-    window.history.replaceState({ tab: 'list' }, '', '');
-    const handleHardwareBack = (event) => {
-      if (event.state && event.state.tab) {
-        setActiveTab(event.state.tab);
-        setShowMoreDetails(false); 
-        setActiveMenu(null);
-      } else { navigateTo('list'); }
-    };
-    window.addEventListener('popstate', handleHardwareBack);
-    return () => window.removeEventListener('popstate', handleHardwareBack);
-  }, []);
-
-  const navigateTo = (newTab) => {
-    if (activeTab === newTab) return;
-    setActiveTab(newTab);
-    window.history.pushState({ tab: newTab }, '', `#${newTab}`);
-    window.scrollTo(0, 0);
-  };
-
-  useEffect(() => { getSongs() }, [])
-
-  async function getSongs() {
-    const { data } = await supabase.from('songs').select('*').order('created_at', { ascending: false })
-    if (data) setSongs(data)
-  }
-
-  // NEW: Permanent multi-file deletion handler
-  const handleDeleteSelected = async () => {
-    if (selectedIds.length === 0) return;
-    if (!window.confirm(`Permanently delete ${selectedIds.length} selected song(s)?`)) return;
-
-    setIsUploading(true);
-    setUploadProgressText("Deleting from server...");
-    const songsToDelete = songs.filter(s => selectedIds.includes(s.id));
-
-    try {
-      for (const song of songsToDelete) {
-        // 1. Delete Audio from Cloudinary
-        const audioId = extractPublicId(song.audio_url);
-        if (audioId) await fetch('/api/deleteAudio', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ public_id: audioId })});
-        
-        // 2. Delete Cover from Cloudinary
-        if (song.cover_url) {
-          const coverId = extractPublicId(song.cover_url);
-          if (coverId) await fetch('/api/deleteImage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ public_id: coverId })});
-        }
-        // 3. Delete from Supabase
-        await supabase.from('songs').delete().eq('id', song.id);
-      }
-      // Update UI
-      setSongs(prev => prev.filter(s => !selectedIds.includes(s.id)));
-      setSelectedIds([]);
-      setIsSelectionMode(false);
-      // Stop playback if current song was deleted
-      if (songsToDelete.find(s => s.id === currentSong?.id)) {
-        handleStop();
-        setCurrentSong(null);
-      }
-    } catch (err) { console.error("Deletion Error:", err); }
-    finally { setIsUploading(false); setUploadProgressText(''); }
-  }
-
-  const handleTimeUpdate = () => {
-    if (!audioRef.current) return;
-    const current = audioRef.current.currentTime;
-    const duration = audioRef.current.duration;
-    if (duration) {
-      setProgress((current / duration) * 100);
-      const mins = Math.floor(current / 60);
-      const secs = Math.floor(current % 60).toString().padStart(2, '0');
-      setCurrentTimeFormatted(`${mins}:${secs}`);
-    }
-  }
-
-  const handleStop = (e) => {
-    if (e) e.stopPropagation();
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      setIsPlaying(false);
-      setProgress(0);
-      setCurrentTimeFormatted('0:00');
-    }
-  }
-
-  const handlePlayPause = (song) => {
-    if (!audioRef.current) return;
-    if (currentSong && currentSong.audio_url === song.audio_url) {
-      if (isPlaying) { audioRef.current.pause(); setIsPlaying(false); }
-      else { audioRef.current.play().catch(e => console.error(e)); setIsPlaying(true); }
-    } else {
-      setCurrentSong(song);
-      setIsPlaying(true);
-      audioRef.current.src = song.audio_url;
-      audioRef.current.load(); 
-      audioRef.current.play().catch(e => { console.error("Playback blocked:", e); setIsPlaying(false); });
-    }
-    setActiveMenu(null); 
-  }
-
-  // NEW: Sorting logic applied to the base songs array
-  const sortedSongs = [...songs].sort((a, b) => {
-    if (sortOrder === 'az') return (a.title || '').localeCompare(b.title || '');
-    if (sortOrder === 'za') return (b.title || '').localeCompare(a.title || '');
-    if (sortOrder === 'oldest') return new Date(a.created_at) - new Date(b.created_at);
-    return new Date(b.created_at) - new Date(a.created_at); // default/newest
-  });
-
-  const handlePreviousSong = () => {
-    if (!sortedSongs.length || !currentSong) return;
-    const currentIndex = sortedSongs.findIndex(s => s.audio_url === currentSong.audio_url);
-    if (currentIndex < sortedSongs.length - 1) { handlePlayPause(sortedSongs[currentIndex + 1]); }
-    else { handlePlayPause(sortedSongs[0]); }
-  }
-
-  const handleNextSong = () => {
-    if (!sortedSongs.length || !currentSong) return;
-    const currentIndex = sortedSongs.findIndex(s => s.audio_url === currentSong.audio_url);
-    if (currentIndex > 0) { handlePlayPause(sortedSongs[currentIndex - 1]); }
-    else { handlePlayPause(sortedSongs[sortedSongs.length - 1]); }
-  }
-
-  const handleSeekBackward = () => { if (audioRef.current) audioRef.current.currentTime -= 10; }
-  const handleSeekForward = () => { if (audioRef.current) audioRef.current.currentTime += 10; }
-
-  const handleToggleFavorite = async () => {
-    if (!currentSong) return;
-    const newFavoriteState = !currentSong.is_favorite;
-    const { data } = await supabase.from('songs').update({ is_favorite: newFavoriteState }).eq('id', currentSong.id).select();
-    if (data) {
-      const updatedSongs = songs.map(s => (s.id === data[0].id ? data[0] : s));
-      setSongs(updatedSongs);
-      setCurrentSong(data[0]); 
-    }
-  }
-
-  const handleOpenInfo = () => {
-    setShowMoreDetails(true);
-    setTimeout(() => {
-      moreDetailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
-  }
-
-  const handleAddToPlaylistDetailed = () => { if (currentSong) alert("Open Playlist Selector! (Architecture coming next)"); }
-
-  const toggleMenu = (e, songId) => {
-    e.stopPropagation(); 
-    setActiveMenu(activeMenu === songId ? null : songId);
-  }
-
-  const handleGoToDetails = (e, song) => {
-    e.stopPropagation();
-    setCurrentSong(song);
-    navigateTo('detail');
-    setShowMoreDetails(false);
-    setActiveMenu(null);
-  }
-
-  const handleFileUpload = async (event) => {
-    const files = Array.from(event.target.files);
-    if (files.length === 0) return;
-    setIsUploading(true);
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      setUploadProgressText(`Uploading ${i + 1} of ${files.length}...`);
-
-      await new Promise((resolve) => {
-        const objectURL = URL.createObjectURL(file);
-        const tempAudio = new Audio(objectURL);
-        
-        tempAudio.addEventListener('loadedmetadata', () => {
-          const mins = Math.floor(tempAudio.duration / 60);
-          const secs = Math.floor(tempAudio.duration % 60).toString().padStart(2, '0');
-          const durationStr = `${mins}:${secs}`;
-          URL.revokeObjectURL(objectURL);
-
-          jsmediatags.read(file, {
-            onSuccess: async function(tag) {
-              try {
-                const tags = tag.tags;
-                let coverUrl = '';
-
-                if (tags.picture) {
-                  const byteArray = new Uint8Array(tags.picture.data);
-                  const blob = new Blob([byteArray], { type: tags.picture.format });
-                  const imgFormData = new FormData();
-                  imgFormData.append('file', blob);
-                  imgFormData.append('upload_preset', 'mMelody_preset');
-                  const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: imgFormData });
-                  coverUrl = (await imgRes.json()).secure_url;
-                }
-
-                const audioFormData = new FormData();
-                audioFormData.append('file', file);
-                audioFormData.append('upload_preset', 'mMelody_preset');
-                const audioRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/video/upload`, { method: 'POST', body: audioFormData });
-                const audioUrl = (await audioRes.json()).secure_url;
-
-                const newSong = {
-                  title: tags.title || file.name.replace('.mp3', ''),
-                  subtitle: extractTagText(tags.TIT3) || '',
-                  artist: tags.artist || '',
-                  album: tags.album || '',
-                  genre: tags.genre || '',
-                  release_year: tags.year || '',
-                  duration: durationStr,
-                  comment: extractTagText(tags.COMM) || '',
-                  composer: extractTagText(tags.TCOM) || '', 
-                  lyricist: extractTagText(tags.TEXT) || extractTagText(tags.TOLY) || '',
-                  lyrics: extractTagText(tags.USLT) || extractTagText(tags.SYLT) || '', 
-                  audio_url: audioUrl,
-                  cover_url: coverUrl,
-                  is_favorite: false,
-                  created_at: new Date().toISOString()
-                };
-
-                const { data } = await supabase.from('songs').insert([newSong]).select();
-                if (data) setSongs(prev => [data[0], ...prev]);
-              } catch (err) { console.error("Upload error:", err); } 
-              finally { resolve(); }
-            },
-            onError: function() { resolve(); }
-          });
-        });
-      });
-    }
-    setIsUploading(false);
-    setUploadProgressText('');
-    event.target.value = null; 
-  }
-
-  const filteredSongs = sortedSongs.filter(song =>
-    (song.title && song.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (song.artist && song.artist.toLowerCase().includes(searchTerm.toLowerCase()))
-  )
-
-  const toggleSelection = (id) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  }
-
-  return (
-    <div className="app-root" onClick={() => setActiveMenu(null)}> 
-      <audio ref={audioRef} onEnded={() => setIsPlaying(false)} onTimeUpdate={handleTimeUpdate} />
-
-      <div className="main-content-area">
-        {activeTab === 'detail' && (
-          currentSong ? (
-            <div className="detail-view-container">
-              <button className="back-btn" onClick={() => navigateTo('list')}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-              </button>
-
-              <div className="detail-art-container">
-                {currentSong.cover_url ? (
-                  <img src={currentSong.cover_url} alt="cover" className="detail-art" />
-                ) : (
-                  <div className="detail-art placeholder-large">🎵</div>
-                )}
-              </div>
-              
-              <div className="scrolling-wrapper">
-                <div className="scrolling-text">
-                  <span className="scroll-title">{currentSong.title || 'Unknown Title'}</span>
-                  {currentSong.artist && <span className="scroll-artist"> • {currentSong.artist}</span>}
-                </div>
-              </div>
-
-              <div className="detail-interaction-row">
-                {/* 4th Button: Add to Queue (List with Right Arrow) */}
-                <button 
-                  className="detail-inter-btn" 
-                  onClick={() => alert("Add to Queue logic coming soon!")} 
-                  title="Play Next in Queue"
-                >
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    {/* The top two horizontal lines of the list */}
-                    <line x1="4" y1="6" x2="20" y2="6"></line>
-                    <line x1="4" y1="12" x2="20" y2="12"></line>
-                    {/* The shortened bottom line */}
-                    <line x1="4" y1="18" x2="11" y2="18"></line>
-                    {/* The right-pointing arrow */}
-                    <polyline points="15 15 18 18 15 21"></polyline>
-                    <line x1="11" y1="18" x2="18" y2="18"></line>
-                  </svg>
-                </button>
-                
-                <button className="detail-inter-btn" onClick={handleOpenInfo}>
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-                  </svg>
-                </button>
-
-                <button className="detail-inter-btn" onClick={handleAddToPlaylistDetailed}>
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zM2 16h8v-2H2v2zm14-1v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4z"/>
-                  </svg>
-                </button>
-
-                <button className="detail-inter-btn menu-container"><button className="menu-btn" onClick={(e) => toggleMenu(e, currentSong.id)}>⋮</button>{activeMenu === currentSong.id && (<div className="dropdown-menu dropdown-upward"><div className="dropdown-item" onClick={handleToggleFavorite}>❤️ {currentSong.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div><div className="dropdown-item" onClick={handleAddToPlaylistDetailed}>💽 Add to Playlist</div></div>)}</button>
-              </div>
-              
-              <div className="detail-progress-container">
-                <div className="progress-bar-bg">
-                  <div className="progress-bar-fill" style={{ width: `${progress}%` }}></div>
-                </div>
-                <div className="time-row">
-                  <span>{currentTimeFormatted}</span>
-                  <span>{currentSong.duration || '0:00'}</span>
-                </div>
-              </div>
-
-              <div className="detail-playback-controls-bar">
-                <button className="pro-ctrl-btn" onClick={handleSeekBackward}>
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/>
-                  </svg>
-                </button>
-                <button className="pro-ctrl-btn" onClick={handlePreviousSong}><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
-                <button className="pro-ctrl-btn master-play-pause-btn" onClick={() => handlePlayPause(currentSong)}>
-                  {isPlaying ? (
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
-                  ) : (
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
-                  )}
-                </button>
-                
-                <button className="pro-ctrl-btn master-stop-btn" onClick={handleStop}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-                </button>
-                <button className="pro-ctrl-btn" onClick={handleNextSong}><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6zm10-12h2v12h-2z"/></svg></button>
-                
-                <button className="pro-ctrl-btn" onClick={handleSeekForward}>
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6-8.5-6z"/>
-                  </svg>
-                </button>
-              </div>
-
-              <div className="more-details-wrapper" ref={moreDetailsRef}>
-                <button className="more-details-btn" onClick={() => setShowMoreDetails(!showMoreDetails)}>
-                  {showMoreDetails ? 'Hide Details' : 'More Details'}
-                </button>
-                {showMoreDetails && (
-                  <div className="more-details-content">
-                    <div className="tag-grid">
-                      <div className="tag-item"><span>Title:</span> {currentSong.title || 'Unknown'}</div>
-                      <div className="tag-item"><span>Artist:</span> {currentSong.artist || 'Unknown'}</div>
-                      <div className="tag-item"><span>Subtitle:</span> {currentSong.subtitle || 'Unknown'}</div>
-                      <div className="tag-item"><span>Album:</span> {currentSong.album || 'Unknown'}</div>
-                      <div className="tag-item"><span>Year:</span> {currentSong.release_year || 'Unknown'}</div>
-                      <div className="tag-item"><span>Composer:</span> {currentSong.composer || 'Unknown'}</div>
-                      <div className="tag-item"><span>Lyricist:</span> {currentSong.lyricist || 'Unknown'}</div>
-                      <div className="tag-item"><span>Genre:</span> {currentSong.genre || 'Unknown'}</div>
-                      <div className="tag-item"><span>Comment:</span> {currentSong.comment || 'None'}</div>
-                    </div>
-                    {currentSong.lyrics ? (
-                      <div className="lyrics-box"><h4>Lyrics</h4><p>{currentSong.lyrics}</p></div>
-                    ) : (
-                      <div className="lyrics-box"><p style={{color: '#888', fontStyle: 'italic'}}>No lyrics embedded in this file.</p></div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="empty-state"><h3>No song selected</h3><p>Play a song from the list view to see details.</p></div>
-          )
-        )}
-
-        {activeTab === 'list' && (
-          <div className="app-container">
-            <header className="header attractive-header">
-              <div className="header-bg-glow"></div>
-              {/* NEW: Updated structure to hold logo and text together */}
-              <div className="brand-header-wrapper">
-                  <img src={logoImage} alt="mMelody logo" className="app-logo" />
-                  <h2>mMelody</h2>
-              </div>
-              
-              <div className="upload-container">
-                <button className="upload-btn" onClick={() => fileInputRef.current.click()} disabled={isUploading}>
-                  {isUploading ? `⏳ ${uploadProgressText}` : 'Upload Music'}
-                </button>
-                <input type="file" accept="audio/mpeg, audio/mp3" multiple ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} />
-              </div>
-
-              {/* NEW: Selection and Sorting Toolbar */}
-              <div className="selection-toolbar">
-                <div className="toolbar-left">
-                  <button className="action-icon-btn" onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }}>
-                    {isSelectionMode ? 'Cancel' : 'Select'}
-                  </button>
-                  {isSelectionMode && selectedIds.length > 0 && (
-                    <button className="delete-btn-red" onClick={handleDeleteSelected}>
-                      Delete ({selectedIds.length})
-                    </button>
-                  )}
-                </div>
-                <select className="sort-select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
-                  <option value="newest">Newest First</option>
-                  <option value="oldest">Oldest First</option>
-                  <option value="az">A-Z (Title)</option>
-                  <option value="za">Z-A (Title)</option>
-                </select>
-              </div>
-
-              {showSearch && (
-                <input
-                  type="text"
-                  placeholder="Search songs or artists..."
-                  className="search-bar animate-search"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  autoFocus
-                />
-              )}
-            </header>
-            
-            <div className="song-list">
-              {filteredSongs.map((song, index) => {
-                const isThisPlaying = currentSong && currentSong.audio_url === song.audio_url;
-                const uniqueId = song.id || index;
-                const isSelected = selectedIds.includes(song.id); // NEW: Check if selected
-
-                return (
-                  <div key={uniqueId} className={`list-item ${isThisPlaying ? 'active' : ''} ${isSelected ? 'selected-row' : ''}`}>
-                    <div className="list-clickable-area" onClick={() => isSelectionMode ? toggleSelection(song.id) : handlePlayPause(song)}>
-                      {isSelectionMode ? (
-                        <div className={`custom-checkbox ${isSelected ? 'checked' : ''}`}></div>
-                      ) : (
-                        <div className="drag-handle">=</div>
-                      )}
-                      
-                      {song.cover_url ? (<img src={song.cover_url} alt="cover" className="list-art" />) : (<div className="list-art placeholder">🎵</div>)}
-                      <div className="list-info">
-                        <div className="list-title">{song.title || 'Unknown Audio'}</div>
-                        <div className="list-subtitle">
-                          {song.artist && <span>{song.artist}</span>}
-                          {isThisPlaying && (
-                            <span className="list-time-counter">
-                              {currentTimeFormatted} / {song.duration || '0:00'}
-                            </span>
-                          )}
-                        </div>
-                        {isThisPlaying && (
-                          <div className="list-progress-bar"><div className="list-progress-fill" style={{ width: `${progress}%` }}></div></div>
-                          )}
-                      </div>
-                    </div>
-
-                    {/* NEW: Hide normal actions when in selection mode */}
-                    {!isSelectionMode && (
-                      <div className="list-actions">
-                        {isThisPlaying && (
-                          <button className="list-stop-btn" onClick={handleStop}>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-                          </button>
-                        )}
-                        <div className="list-status">
-                          {isThisPlaying && isPlaying ? (
-                            <svg className="playing-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#56CCF2" strokeWidth="2" strokeLinecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
-                          ) : (<span className="duration-text">{song.duration || '--:--'}</span>)}
-                        </div>
-
-                        <div className="menu-container">
-                          <button className="menu-btn" onClick={(e) => toggleMenu(e, uniqueId)}>⋮</button>
-                          {activeMenu === uniqueId && (
-                            <div className="dropdown-menu">
-                              <div className="dropdown-item" onClick={(e) => handleGoToDetails(e, song)}>📄 Go to Details</div>
-                              <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); alert("Added to queue!"); }}>⏮ Add to Queue</div>
-                              <div className="dropdown-item" onClick={handleToggleFavorite}>❤️ {currentSong.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div>
-                              <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); alert("Ready to build Playlists!"); }}>💽 Add to Playlist</div>
-                              {/* NEW: Singular Delete in Menu */}
-                              <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={() => { setSelectedIds([song.id]); handleDeleteSelected(); }}>🗑 Delete Song</div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {['queue', 'albums', 'artists', 'playlists'].includes(activeTab) && (
-          <div className="empty-state"><h3>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h3><p>This architecture is coming soon!</p></div>
-        )}
-      </div>
-
-      <nav className="bottom-footer">
-        <button className={`footer-btn ${activeTab === 'list' ? 'active-tab' : ''}`} onClick={() => navigateTo('list')}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg></button>
-        <button className={`footer-btn ${activeTab === 'detail' ? 'active-tab' : ''}`} onClick={() => navigateTo('detail')}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg></button>
-        <button className={`footer-btn ${activeTab === 'queue' ? 'active-tab' : ''}`} onClick={() => navigateTo('queue')}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg></button>
-        <button className={`footer-btn ${activeTab === 'albums' ? 'active-tab' : ''}`} onClick={() => navigateTo('albums')}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg></button>
-        <button className={`footer-btn ${activeTab === 'artists' ? 'active-tab' : ''}`} onClick={() => navigateTo('artists')}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></button>
-        <button className={`footer-btn ${activeTab === 'playlists' ? 'active-tab' : ''}`} onClick={() => navigateTo('playlists')}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg></button>
-        <button className={`footer-btn ${showSearch ? 'active-tab' : ''}`} onClick={() => { navigateTo('list'); setShowSearch(!showSearch); }}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></button>
-      </nav>
-    </div>
-  )
+.app-root { 
+  width: 100%; 
+  display: flex; 
+  flex-direction: column;
+  justify-content: flex-start; 
+  align-items: center;
+  min-height: 100vh;
 }
 
-export default App
+.main-content-area {
+  width: 100%;
+  max-width: 500px;
+  padding-bottom: 70px;
+}
+
+.app-container, .detail-view-container {
+  width: 100%;
+  box-sizing: border-box;
+  background-color: #000;
+  position: relative;
+}
+
+/* --- Header & Upload --- */
+.attractive-header {
+  padding: 25px 20px 10px 20px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(10, 10, 10, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  overflow: hidden;
+}
+
+.header-bg-glow { position: absolute; top: -50px; left: 50%; transform: translateX(-50%); width: 200px; height: 100px; background: #2F80ED; filter: blur(80px); opacity: 0.35; z-index: -1; }
+
+/* NEW: Logo and text header integration styling */
+.brand-header-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px; /* Spacing between logo and text */
+  margin-bottom: 20px;
+}
+
+.app-logo {
+  width: 60px;  /* <-- CHANGE THIS NUMBER to make it wider */
+  height: 60px; /* <-- CHANGE THIS NUMBER to make it taller (keep them equal!) */
+  flex-shrink: 0;
+  border-radius: 50%; /* Optional: rounds the hard edges of the image if it has a background */
+}
+
+/* Note: I completely deleted the @keyframes logo-pulse block that was here! */
+
+.brand-header-wrapper h2 { 
+  margin: 0; 
+  font-size: 2.4rem; /* Slightly larger to match the bold look */
+  font-weight: 800; 
+  font-family: 'Varela Round', 'Nunito', 'Segoe UI', sans-serif; /* Smooth, rounded font style */
+  background: linear-gradient(90deg, #56CCF2, #2F80ED); /* Deepened the blue slightly to match the neon vibe */
+  -webkit-background-clip: text; 
+  -webkit-text-fill-color: transparent; 
+  letter-spacing: -1px; /* Pulls the letters a bit closer together */
+}
+
+@keyframes logo-pulse {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 2px #56CCF2); }
+  50% { transform: scale(1.05); filter: drop-shadow(0 0 8px #56CCF2); }
+}
+
+.upload-container { display: flex; justify-content: center; margin-bottom: 15px; }
+.upload-btn { background-color: #2F80ED; color: #ffffff; border: none; border-radius: 20px; padding: 10px 24px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+.upload-btn:hover:not(:disabled) { background-color: #56CCF2; color: #000000; transform: scale(1.02); }
+.upload-btn:disabled { background-color: #333; color: #888; }
+
+.search-bar { width: 100%; padding: 12px 18px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background-color: rgba(255, 255, 255, 0.05); color: white; font-size: 1rem; box-sizing: border-box; outline: none; margin-bottom: 10px; transition: border-color 0.2s; }
+.search-bar:focus { border-color: #56CCF2; }
+.animate-search { animation: slideDown 0.3s ease; }
+
+/* --- List View --- */
+.song-list { display: flex; flex-direction: column; }
+.list-item { display: flex; align-items: center; padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); transition: background-color 0.2s; background-color: #000; }
+.list-item:hover { background-color: rgba(255,255,255,0.03); }
+.list-item.active { background-color: rgba(47, 128, 237, 0.12); }
+.list-item.active .list-title { color: #56CCF2; }
+
+/* NEW: Highlight color for multi-selected rows */
+.selected-row {
+  background-color: rgba(86, 204, 242, 0.1) !important;
+}
+
+.list-clickable-area { display: flex; align-items: center; flex-grow: 1; cursor: pointer; }
+.drag-handle { color: #555; font-size: 1.5rem; margin-right: 15px; }
+.list-art { width: 45px; height: 45px; border-radius: 6px; object-fit: cover; margin-right: 15px; background-color: #222; display: flex; align-items: center; justify-content: center; }
+
+.list-info { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; text-align: left; margin-right: 10px; }
+.list-title { font-size: 0.85rem; margin-bottom: 4px; font-weight: 500; }
+.list-subtitle { 
+  color: #999; 
+  font-size: 0.85rem; 
+  display: flex; 
+  flex-direction: column; /* Forces the line break */
+  align-items: flex-start; /* Keeps the artist name aligned to the left */
+  width: 100%;
+}
+
+.list-time-counter { 
+  color: #56CCF2; 
+  font-weight: 500; 
+  font-variant-numeric: tabular-nums; 
+  align-self: center; /* Centers the counter on its new line */
+  margin-top: 4px; /* Adds a tiny bit of breathing room above it */
+}
+.list-progress-bar { width: 100%; height: 3px; background-color: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+.list-progress-fill { height: 100%; background-color: #56CCF2; }
+
+.list-actions { display: flex; align-items: center; gap: 8px; }
+.list-stop-btn { background: transparent; border: none; color: #E0245E; padding: 5px; cursor: pointer; }
+.list-stop-btn:hover { color: #fc5c84; }
+.list-status { width: 35px; text-align: right; display: flex; justify-content: flex-end; }
+.duration-text { color: #666; font-size: 0.85rem; font-weight: 500; }
+.playing-icon { animation: pulse 1.5s infinite alternate; }
+
+@keyframes pulse { 0% { opacity: 0.6; } 100% { opacity: 1; } }
+
+/* --- 3-Dot Menu --- */
+.menu-container { position: relative; display: flex; align-items: center; justify-content: center; margin-left: 5px; }
+.menu-btn { background: transparent; border: none; color: #888; font-size: 1.5rem; font-weight: bold; cursor: pointer; padding: 0 5px; height: 100%; display: flex; align-items: center; }
+.menu-btn:hover { color: #fff; }
+
+.dropdown-menu { position: absolute; top: 30px; right: 0; background-color: #282828; border: 1px solid #444; border-radius: 8px; width: 180px; box-shadow: 0 8px 24px rgba(0,0,0,0.8); z-index: 100; overflow: hidden; animation: slideDown 0.2s ease; }
+.dropdown-item { 
+  padding: 14px 16px; 
+  font-size: 0.95rem; 
+  color: #eee; 
+  cursor: pointer; 
+  border-bottom: 1px solid #333; 
+  text-align: left; /* CRITICAL: Forces all items to align cleanly to the left edge */
+}
+.dropdown-item:last-child { border-bottom: none; }
+.dropdown-item:hover { background-color: #3e3e3e; }
+@keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+.dropdown-upward { top: auto; bottom: 30px; animation: slideUp 0.2s ease; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* --- Detail View --- */
+.detail-view-container { 
+  padding: 15px 20px 80px 20px; /* Reduced top padding to save space */
+  display: flex; 
+  flex-direction: column; 
+  background: linear-gradient(180deg, #121A2F 0%, #000000 100%); 
+  min-height: 100vh; 
+}
+
+.back-btn {
+  background: transparent; border: none; color: #aaa;
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 0 10px 0; cursor: pointer;
+}
+.back-btn:hover { color: #fff; }
+
+/* COMPRESSED ALBUM ART */
+.detail-art-container { 
+  width: 100%; 
+  max-width: 330px; /* Restricts size on standard mobile screens to save vertical space */
+  margin: 0 auto 20px auto; /* Reduced margin */
+  aspect-ratio: 1 / 1; 
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5); 
+  border-radius: 12px; 
+  overflow: hidden; 
+}
+.detail-art { width: 100%; height: 100%; object-fit: cover; }
+.placeholder-large { font-size: 5rem; background-color: #222; display: flex; align-items: center; justify-content: center; height: 100%; }
+
+/* --- NEW: SCROLLING MARQUEE TEXT --- */
+.scrolling-wrapper {
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  box-sizing: border-box;
+  margin-bottom: 15px; /* Compressed Margin */
+  position: relative;
+  /* Adds a smooth fade out on the left and right edges */
+  mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+}
+
+.scrolling-text {
+  display: inline-block;
+  padding-left: 100%; /* Pushes text to start off-screen right */
+  animation: marquee 12s linear infinite;
+}
+
+.scroll-title {
+  font-size: 1.1rem; /* Reduced from 1.3rem */
+  font-weight: 500;
+  color: #fff;
+}
+
+.scroll-artist {
+  font-size: 0.9rem; /* Reduced from 1.1rem */
+  color: #56CCF2; /* Beautiful Theme Accent */
+  font-weight: 500;
+  margin-left: 8px;
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
+}
+
+/* COMPRESSED INTERACTION ROW */
+.detail-interaction-row {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  margin-bottom: 15px; /* Reduced from 25px */
+}
+
+.detail-inter-btn { background: transparent; border: none; color: #888; cursor: pointer; padding: 10px; border-radius: 50%; transition: all 0.2s; }
+.detail-inter-btn:hover { color: #fff; background-color: rgba(255,255,255,0.05); }
+.detail-inter-btn.favorite-filled { color: #E0245E; }
+.detail-inter-btn.favorite-filled:hover { background-color: rgba(224, 36, 94, 0.1); }
+
+/* COMPRESSED PROGRESS BAR */
+.detail-progress-container { margin-bottom: 10px; /* Tighter gap below timer */ }
+.progress-bar-bg { width: 100%; height: 5px; background: rgba(255,255,255,0.1); border-radius: 3px; margin-bottom: 8px; }
+.progress-bar-fill { height: 100%; background: #ffffff; border-radius: 3px; }
+.time-row { display: flex; justify-content: space-between; color: #888; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+
+/* COMPRESSED PLAYBACK CONTROLS */
+.detail-playback-controls-bar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px; /* Squeezed slightly to fit the new button perfectly */
+  margin-bottom: 5px; /* Significantly reduced gap below controls */
+}
+
+.pro-ctrl-btn { 
+  background: transparent; 
+  border: none; 
+  color: #fff; 
+  cursor: pointer; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  border-radius: 50%; 
+  transition: transform 0.2s, background-color 0.2s; 
+  padding: 10px; 
+  flex-shrink: 0; 
+  -webkit-tap-highlight-color: transparent; /* CRITICAL: Kills the mobile tap square */
+  outline: none; /* CRITICAL: Kills the desktop focus square */
+}
+
+.master-play-pause-btn { 
+  width: 45px; 
+  height: 45px; 
+  background-color: #ffffff; /* Solid white circle */
+  color: #2F80ED; /* Deeper blue icon for great contrast against white */
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15); /* Soft, subtle white glow */
+}
+.master-play-pause-btn:hover { 
+  background-color: #e6e6e6; /* Slightly darker grey-white on hover */
+  transform: scale(1.05); 
+}
+
+.master-stop-btn { 
+  width: 45px; 
+  height: 45px; 
+  background-color: #ffffff; /* Solid white circle */
+  color: #E0245E; /* Vibrant red icon */
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15); /* Soft, subtle white glow */
+}
+.master-stop-btn:hover { 
+  background-color: #e6e6e6; /* Slightly darker grey-white on hover */
+  transform: scale(1.05); 
+}
+
+.more-details-wrapper { margin-top: 5px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; }
+.more-details-btn { width: 100%; background-color: transparent; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 12px; border-radius: 20px; font-size: 1rem; cursor: pointer; transition: background-color 0.2s; }
+.more-details-btn:hover { background-color: rgba(255,255,255,0.05); }
+.more-details-content { margin-top: 20px; animation: fadeIn 0.3s ease; }
+.tag-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
+.tag-item { 
+  font-size: 0.8rem; /* Decreased from 0.9rem to shrink the actual data values */
+  color: #ddd; 
+  background: rgba(255,255,255,0.05); 
+  padding: 10px; 
+  border-radius: 8px; 
+}
+.tag-item span { 
+  color: #56CCF2; 
+  display: block; 
+  font-size: 0.75rem; /* Shrunk slightly to maintain the visual hierarchy */
+  margin-bottom: 3px; 
+  font-weight: 700; /* CRITICAL: Makes the label bold */
+  text-transform: uppercase; /* Optional: Makes it look even cleaner, like a native app label */
+  letter-spacing: 0.5px; /* Gives the bold letters a tiny bit of breathing room */
+}
+.lyrics-box { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; }
+.lyrics-box h4 { margin: 0 0 15px 0; color: #56CCF2; } 
+.lyrics-box p { white-space: pre-wrap; color: #ddd; line-height: 1.6; font-size: 1.25rem; margin: 0; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.empty-state { padding: 50px 20px; text-align: center; color: #888; }
+.empty-state h3 { color: #fff; margin-bottom: 10px; font-size: 1.5rem; }
+
+/* --- NATIVE BOTTOM NAVIGATION BAR --- */
+.bottom-footer { position: fixed; bottom: 0; width: 100%; max-width: 500px; height: 60px; background-color: #0A0F18; border-top: 1px solid #1A2639; display: flex; justify-content: space-around; align-items: center; z-index: 1000; }
+.footer-btn { background: transparent; border: none; color: #66758C; cursor: pointer; padding: 10px; display: flex; align-items: center; justify-content: center; transition: color 0.2s; }
+.footer-btn:hover { color: #fff; }
+.footer-btn.active-tab { color: #56CCF2; }
+
+
+/* --- SELECTION & SORTING TOOLBAR (NEW) --- */
+.selection-toolbar { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  margin-bottom: 15px; 
+}
+.action-icon-btn { 
+  background-color: rgba(255,255,255,0.1); 
+  border: none; 
+  color: #fff; 
+  padding: 8px 16px; 
+  border-radius: 20px; 
+  font-size: 0.85rem; 
+  font-weight: 600; 
+  cursor: pointer; 
+  transition: background-color 0.2s; 
+}
+.action-icon-btn:hover { 
+  background-color: rgba(255,255,255,0.2); 
+}
+.delete-btn-red { 
+  background-color: #E0245E; 
+  color: #fff; 
+  border: none; 
+  padding: 8px 16px; 
+  border-radius: 20px; 
+  font-size: 0.85rem; 
+  font-weight: 600; 
+  margin-left: 10px; 
+  cursor: pointer; 
+  transition: background-color 0.2s; 
+}
+.delete-btn-red:hover { 
+  background-color: #ff3366; 
+}
+.sort-select { 
+  background-color: rgba(255,255,255,0.05); 
+  color: #fff; 
+  border: 1px solid rgba(255,255,255,0.2); 
+  padding: 8px 12px; 
+  border-radius: 8px; 
+  font-size: 0.85rem; 
+  outline: none; 
+  cursor: pointer; 
+}
+.sort-select option { 
+  background-color: #282828; 
+  color: #fff; 
+}
+
+/* --- CUSTOM CHECKBOX STYLING --- */
+.custom-checkbox { 
+  width: 20px; 
+  height: 20px; 
+  border: 2px solid #555; 
+  border-radius: 4px; 
+  margin-right: 15px; 
+  flex-shrink: 0; 
+  transition: all 0.2s; 
+}
+.custom-checkbox.checked { 
+  background-color: #56CCF2; 
+  border-color: #56CCF2; 
+  position: relative; 
+}
+.custom-checkbox.checked::after { 
+  content: ''; 
+  position: absolute; 
+  left: 6px; 
+  top: 2px; 
+  width: 4px; 
+  height: 10px; 
+  border: solid #000; 
+  border-width: 0 2px 2px 0; 
+  transform: rotate(45deg); 
+}
