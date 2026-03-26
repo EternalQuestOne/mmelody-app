@@ -231,6 +231,9 @@ body {
 
 .detail-inter-btn { background: transparent; border: none; color: #888; cursor: pointer; padding: 10px; border-radius: 50%; transition: all 0.2s; }
 .detail-inter-btn:hover { color: #fff; background-color: rgba(255,255,255,0.05); }
+.detail-inter-btn.active-info { 
+  color: #56CCF2; /* This is your neon blue theme color! */
+}
 .detail-inter-btn.favorite-filled { color: #E0245E; }
 .detail-inter-btn.favorite-filled:hover { background-color: rgba(224, 36, 94, 0.1); }
 
