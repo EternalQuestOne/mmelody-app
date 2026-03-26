@@ -743,23 +743,36 @@ function App() {
                 playlists.map(playlist => (
                   <div key={playlist.id} className="playlist-card" onClick={() => alert("Opening playlist songs logic coming next!")}>
                     <div className="playlist-art-wrapper">
-                      {playlist.cover_url ? (
+                      {/* NEW: Shows a loading pulse while uploading this specific cover */}
+                      {isUploading && editingPlaylistId === playlist.id ? (
+                        <div className="playlist-art-placeholder spinner-pulse">⏳</div>
+                      ) : playlist.cover_url ? (
                         <img src={playlist.cover_url} alt={playlist.name} className="playlist-art-img" />
                       ) : (
                         <div className="playlist-art-placeholder">💽</div>
                       )}
+                    </div>
+                    
+                    {/* NEW: Info row with 3-dot menu instead of sticky hover */}
+                    <div className="playlist-card-info">
+                      <div className="playlist-card-name">{playlist.name}</div>
                       
-                      {/* The Hover/Edit Overlay */}
-                      <div className="playlist-art-overlay">
-                        <button className="edit-art-btn" onClick={(e) => { e.stopPropagation(); triggerPlaylistCoverUpload(playlist.id); }}>
-                          {playlist.cover_url ? 'Change Art' : 'Add Art'}
-                        </button>
-                        {playlist.cover_url && (
-                          <button className="delete-art-btn" onClick={(e) => handleDeletePlaylistCover(e, playlist)}>Remove</button>
+                      <div className="menu-container">
+                        <button className="menu-btn" onClick={(e) => toggleMenu(e, `pl-${playlist.id}`)}>⋮</button>
+                        {activeMenu === `pl-${playlist.id}` && (
+                          <div className="dropdown-menu dropdown-upward" style={{ right: '-10px', top: 'auto', bottom: '30px' }}>
+                            <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); triggerPlaylistCoverUpload(playlist.id); }}>
+                              🖼 {playlist.cover_url ? 'Change Art' : 'Add Art'}
+                            </div>
+                            {playlist.cover_url && (
+                              <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleDeletePlaylistCover(e, playlist); }}>
+                                🗑 Remove Art
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
-                    <div className="playlist-card-name">{playlist.name}</div>
                   </div>
                 ))
               )}
