@@ -94,7 +94,10 @@ body {
 .list-item { display: flex; align-items: center; padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.05); transition: background-color 0.2s; background-color: #000; }
 .list-item:hover { background-color: rgba(255,255,255,0.03); }
 .list-item.active { background-color: rgba(47, 128, 237, 0.12); }
-.list-item.active .list-title { color: #56CCF2; }
+.list-item.active .list-title, 
+.list-item.active .drag-handle { 
+  color: #56CCF2; 
+}
 
 /* NEW: Highlight color for multi-selected rows */
 .selected-row {
@@ -105,9 +108,31 @@ body {
 .drag-handle { color: #555; font-size: 1.5rem; margin-right: 15px; }
 .list-art { width: 45px; height: 45px; border-radius: 6px; object-fit: cover; margin-right: 15px; background-color: #222; display: flex; align-items: center; justify-content: center; }
 
-.list-info { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; margin-right: 10px; }
-.list-title { font-size: 1.05rem; margin-bottom: 4px; font-weight: 500; }
-.list-subtitle { color: #999; font-size: 0.85rem; }
+.list-info { 
+  flex-grow: 1; 
+  display: flex; 
+  flex-direction: column; 
+  justify-content: center; 
+  margin-right: 10px; 
+  overflow: hidden; /* CRITICAL: This stops long text from pushing other icons off-screen */
+}
+
+.list-title { 
+  font-size: 0.95rem; /* Decreased font size */
+  margin-bottom: 4px; 
+  font-weight: 600; 
+  white-space: nowrap; /* Forces text to stay on one line */
+  overflow: hidden; 
+  text-overflow: ellipsis; /* Adds the '...' when the title is too long */
+}
+
+.list-subtitle { 
+  color: #ffffff; /* Bright white as requested */
+  font-size: 0.8rem; 
+  white-space: nowrap; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+}
 
 .list-time-counter { color: #56CCF2; font-weight: 500; font-variant-numeric: tabular-nums; }
 .list-progress-bar { width: 100%; height: 3px; background-color: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 6px; overflow: hidden; }
