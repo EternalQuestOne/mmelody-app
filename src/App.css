@@ -10,38 +10,38 @@ body {
 }
 
 .app-root { 
-  width: 100%; 
-  display: flex; 
-  flex-direction: column;
-  justify-content: flex-start; 
-  align-items: center;
-  min-height: 100vh;
+  width: 100%; 
+  display: flex; 
+  flex-direction: column;
+  justify-content: flex-start; 
+  align-items: center;
+  min-height: 100vh;
 }
 
 .main-content-area {
-  width: 100%;
-  max-width: 500px;
-  padding-bottom: 70px;
+  width: 100%;
+  max-width: 500px;
+  padding-bottom: 70px;
 }
 
 .app-container, .detail-view-container {
-  width: 100%;
-  box-sizing: border-box;
-  background-color: #000;
-  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  background-color: #000;
+  position: relative;
 }
 
 /* --- Header & Upload --- */
 .attractive-header {
-  padding: 25px 20px 10px 20px;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: rgba(10, 10, 10, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-  overflow: hidden;
+  padding: 25px 20px 10px 20px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(10, 10, 10, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  overflow: hidden;
 }
 
 .header-bg-glow { position: absolute; top: -50px; left: 50%; transform: translateX(-50%); width: 200px; height: 100px; background: #2F80ED; filter: blur(80px); opacity: 0.35; z-index: -1; }
