@@ -254,25 +254,28 @@ body {
 .pro-ctrl-btn:hover { background-color: rgba(255,255,255,0.05); }
 
 .master-play-pause-btn { 
-  width: 60px; /* Reduced from 72px */
-  height: 60px; /* Reduced from 72px */
-  background-color: #2F80ED; 
-  color: #ffffff; 
-  box-shadow: 0 8px 24px rgba(47, 128, 237, 0.4); 
+  width: 45px; 
+  height: 45px; 
+  background-color: transparent; /* Removed solid blue */
+  color: #56CCF2; /* Neon blue icon */
+  box-shadow: none; /* Removed the glowing shadow */
 }
-.master-play-pause-btn:hover { background-color: #56CCF2; color: #000; transform: scale(1.04); }
+.master-play-pause-btn:hover { 
+  background-color: transparent; 
+  color: #ffffff; /* Icon turns white on hover */
+  transform: scale(1.1); /* Slightly larger pop on hover */
+}
 
-/* NEW: The Stop Button Styling */
 .master-stop-btn { 
   width: 45px; 
   height: 45px; 
-  background-color: rgba(224, 36, 94, 0.1); /* Subtle red tinted background */
-  color: #E0245E; /* Vibrant red icon */
+  background-color: transparent; /* Removed the light red background */
+  color: #E0245E; /* Vibrant red icon remains as it is */
 }
 .master-stop-btn:hover { 
-  background-color: #E0245E; 
-  color: #ffffff; 
-  transform: scale(1.04); 
+  background-color: transparent; 
+  color: #ff3366; /* Brightens to light red on hover */
+  transform: scale(1.1); 
 }
 
 .more-details-wrapper { margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; }
