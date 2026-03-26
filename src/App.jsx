@@ -740,7 +740,7 @@ function App() {
                   <div key={playlist.id} className="playlist-list-item" onClick={() => alert("Opening playlist songs logic coming next!")}>
                 <div className="empty-state"><h3>No Playlists</h3><p>Create one by typing a name above!</p></div>
               ) : (
-                playlists.map((playlist, index) => (
+                sortedPlaylists.map((playlist, index) => (
                   <div key={playlist.id} className="playlist-list-item" onClick={() => alert("Opening playlist songs logic coming next!")}>
                     
                     <div className="playlist-list-art">
