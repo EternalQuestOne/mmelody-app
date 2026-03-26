@@ -575,3 +575,8 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* --- LIKED MUSIC PINNED PLAYLIST --- */
+.liked-music-art {
+  background: #FFE5EC; /* Light pink background */
+  font-size: 1.6rem; /* Perfectly sizes the heart emoji */
+}
