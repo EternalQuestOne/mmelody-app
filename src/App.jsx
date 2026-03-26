@@ -267,14 +267,21 @@ function App() {
     }
   }
 
-  const handleToggleFavorite = async () => {
-    if (!currentSong) return;
-    const newFavoriteState = !currentSong.is_favorite;
-    const { data } = await supabase.from('songs').update({ is_favorite: newFavoriteState }).eq('id', currentSong.id).select();
+  const handleToggleFavorite = async (clickedSong) => {
+    // Determine if we are clicking a specific list item, or just the main Detail View button
+    const targetSong = (clickedSong && clickedSong.audio_url) ? clickedSong : currentSong;
+    if (!targetSong) return;
+    
+    const newFavoriteState = !targetSong.is_favorite;
+    const { data } = await supabase.from('songs').update({ is_favorite: newFavoriteState }).eq('id', targetSong.id).select();
+    
     if (data) {
       const updatedSongs = songs.map(s => (s.id === data[0].id ? data[0] : s));
       setSongs(updatedSongs);
-      setCurrentSong(data[0]); 
+      // Only update the currently playing song's UI if it was the one we just favorited!
+      if (currentSong && currentSong.id === data[0].id) {
+        setCurrentSong(data[0]); 
+      }
     }
   }
 
@@ -638,7 +645,7 @@ function App() {
                             <div className="dropdown-menu">
                               <div className="dropdown-item" onClick={(e) => handleGoToDetails(e, song)}>📄 Go to Details</div>
                               <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); alert("Added to queue!"); }}>⏮ Add to Queue</div>
-                              <div className="dropdown-item" onClick={handleToggleFavorite}>❤️ {currentSong.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div>
+                              <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); handleToggleFavorite(song); }}>❤️ {song.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div>
                               <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); handleOpenPlaylistModal(song); }}>💽 Add to Playlist</div>
                               {/* NEW: Singular Delete in Menu */}
                               <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={() => { setSelectedIds([song.id]); handleDeleteSelected(); }}>🗑 Delete Song</div>
