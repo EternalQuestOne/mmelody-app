@@ -420,7 +420,7 @@ function App() {
               {/* NEW: Updated structure to hold logo and text together */}
               <div className="brand-header-wrapper">
                   <img src={logoImage} alt="mMelody logo" className="app-logo" />
-                  <h3>mMelody</h3>
+                  <h2>mMelody</h2>
               </div>
               
               <div className="upload-container">
