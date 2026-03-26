@@ -56,12 +56,13 @@ body {
 }
 
 .app-logo {
-  width: 32px;
-  height: 32px;
+  width: 45px;  /* <-- CHANGE THIS NUMBER to make it wider */
+  height: 45px; /* <-- CHANGE THIS NUMBER to make it taller (keep them equal!) */
   flex-shrink: 0;
-  /* Visual stunning/energetic animation pulse */
-  animation: logo-pulse 2s infinite ease-in-out;
+  border-radius: 50%; /* Optional: rounds the hard edges of the image if it has a background */
 }
+
+/* Note: I completely deleted the @keyframes logo-pulse block that was here! */
 
 .brand-header-wrapper h2 { 
   margin: 0; /* Reset margin from user h2 rule */
