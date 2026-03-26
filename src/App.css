@@ -1,5 +1,5 @@
 /* --- Core Styling --- */
-body {
+html, body {
   background-color: #000000;
   color: #ffffff;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -7,6 +7,7 @@ body {
   padding: 0;
   display: flex;
   justify-content: center;
+  overscroll-behavior-y: none; /* Helps prevent the bouncy overscroll effect */
 }
 
 .app-root { 
@@ -21,7 +22,7 @@ body {
 .main-content-area {
   width: 100%;
   max-width: 500px;
-  padding-bottom: 70px;
+  padding-bottom: 120px; /* Increased from 70px to give plenty of breathing room above the footer */
 }
 
 .app-container, .detail-view-container {

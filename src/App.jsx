@@ -642,7 +642,7 @@ function App() {
                         <div className="menu-container">
                           <button className="menu-btn" onClick={(e) => toggleMenu(e, uniqueId)}>⋮</button>
                           {activeMenu === uniqueId && (
-                            <div className="dropdown-menu">
+                            <div className={`dropdown-menu ${index >= filteredSongs.length - 3 ? 'dropdown-upward' : ''}`}>
                               <div className="dropdown-item" onClick={(e) => handleGoToDetails(e, song)}>📄 Go to Details</div>
                               <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); alert("Added to queue!"); }}>⏮ Add to Queue</div>
                               <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); handleToggleFavorite(song); }}>❤️ {song.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div>
