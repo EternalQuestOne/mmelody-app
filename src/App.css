@@ -467,31 +467,54 @@ body {
 
 /* --- PLAYLISTS TAB SPECIFIC HEADER --- */
 .ocean-header {
-  width: max-content; /* CRITICAL: Shrinks the header to wrap the text perfectly */
-  margin: 15px auto 25px auto; /* Centers it and gives it breathing room */
+  width: max-content; 
+  margin: 15px auto 25px auto; 
   padding: 10px 35px; 
-  background: rgba(255, 255, 255, 0.05); /* Deep dark theme background */
-  border: 1px solid rgba(86, 204, 242, 0.3); /* Subtle neon blue border */
-  border-radius: 30px; /* Makes it a beautiful floating pill */
-  border-bottom: 1px solid rgba(86, 204, 242, 0.3); /* Overrides default header border */
+  background: rgba(47, 128, 237, 0.15); /* Beautiful deep blue tint matching the theme */
+  border: 1px solid #56CCF2; /* Neon blue border */
+  border-radius: 30px; 
   position: relative;
-  top: 10px; 
-}
-
-.ocean-glow {
-  background: #56CCF2; /* Matches your app's core neon blue */
-  opacity: 0.2;
-  width: 120px;
-  height: 40px;
+  box-shadow: 0 4px 15px rgba(86, 204, 242, 0.15); /* Soft neon glow */
 }
 
 .ocean-title {
   margin: 0;
   font-size: 1.25rem; 
   font-weight: 700;
-  color: #fff;
+  color: #56CCF2; /* Bright theme text */
   text-align: center;
   letter-spacing: 0.5px;
+}
+
+/* --- STANDALONE CREATE PLAYLIST ROW --- */
+.create-standalone-playlist {
+  display: flex;
+  gap: 10px;
+  padding: 0 15px;
+  margin-top: 15px;
+  margin-bottom: 25px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.standalone-playlist-input {
+  flex: 1; /* CRITICAL: This is what makes the box stretch fully across the screen again! */
+  background: #EAEAEA; /* Light grey background */
+  border: 1px solid #CCCCCC;
+  color: #333333; /* Dark grey font */
+  padding: 12px 16px;
+  border-radius: 8px;
+  outline: none;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+}
+
+.standalone-playlist-input::placeholder {
+  color: #666666; /* Slightly darker grey for the placeholder so it's readable */
+}
+
+.standalone-playlist-input:focus {
+  border-color: #2F80ED; /* Nice blue border when tapping it */
 }
 
 /* --- YOUTUBE MUSIC STYLE PLAYLIST LIST --- */
