@@ -171,21 +171,37 @@ function App() {
   });
 
   const handlePreviousSong = () => {
-    if (!sortedSongs.length || !currentSong) return;
-    const currentIndex = sortedSongs.findIndex(s => s.audio_url === currentSong.audio_url);
-    if (currentIndex < sortedSongs.length - 1) { handlePlayPause(sortedSongs[currentIndex + 1]); }
-    else { handlePlayPause(sortedSongs[0]); }
-  }
+    if (!sortedSongs.length || !currentSong) return;
+    const currentIndex = sortedSongs.findIndex(s => s.audio_url === currentSong.audio_url);
+    
+    // Previous goes UP the list (index - 1)
+    if (currentIndex > 0) { 
+      handlePlayPause(sortedSongs[currentIndex - 1]); 
+    } else { 
+      // If at the top, loop to the very bottom
+      handlePlayPause(sortedSongs[sortedSongs.length - 1]); 
+    }
+  }
 
-  const handleNextSong = () => {
+  const handleNextSong = () => {
     if (!sortedSongs.length || !currentSong) return;
 
-    // NEW: If shuffle is ON, pick a completely random song
+    // 1. If Shuffle is ON, pick a random song
     if (isShuffle) {
       const randomIndex = Math.floor(Math.random() * sortedSongs.length);
       handlePlayPause(sortedSongs[randomIndex]);
       return; 
     }
+
+    // 2. If Shuffle is OFF, go DOWN the list natively (index + 1)
+    const currentIndex = sortedSongs.findIndex(s => s.audio_url === currentSong.audio_url);
+    if (currentIndex < sortedSongs.length - 1) { 
+      handlePlayPause(sortedSongs[currentIndex + 1]); 
+    } else { 
+      // If at the bottom, loop back to the top
+      handlePlayPause(sortedSongs[0]); 
+    }
+  }
 
     // Standard Next Song Logic
     const currentIndex = sortedSongs.findIndex(s => s.audio_url === currentSong.audio_url);
