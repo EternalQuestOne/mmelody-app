@@ -65,13 +65,14 @@ body {
 /* Note: I completely deleted the @keyframes logo-pulse block that was here! */
 
 .brand-header-wrapper h2 { 
-  margin: 0; /* Reset margin from user h2 rule */
-  font-size: 2.2rem; 
+  margin: 0; 
+  font-size: 2.4rem; /* Slightly larger to match the bold look */
   font-weight: 800; 
-  background: linear-gradient(90deg, #ffffff, #56CCF2); 
+  font-family: 'Varela Round', 'Nunito', 'Segoe UI', sans-serif; /* Smooth, rounded font style */
+  background: linear-gradient(90deg, #56CCF2, #2F80ED); /* Deepened the blue slightly to match the neon vibe */
   -webkit-background-clip: text; 
   -webkit-text-fill-color: transparent; 
-  letter-spacing: -0.5px; 
+  letter-spacing: -1px; /* Pulls the letters a bit closer together */
 }
 
 @keyframes logo-pulse {
