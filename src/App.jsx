@@ -314,7 +314,7 @@ function App() {
 
   return (
     <div className="app-root" onClick={() => setActiveMenu(null)}> 
-      <audio ref={audioRef} onEnded={() => setIsPlaying(false)} onTimeUpdate={handleTimeUpdate} />
+      <audio ref={audioRef} onEnded={handleNextSong} onTimeUpdate={handleTimeUpdate} />
 
       <div className="main-content-area">
         {activeTab === 'detail' && (
