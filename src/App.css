@@ -636,3 +636,45 @@ body {
   to { opacity: 1; transform: translate(-50%, 0); }
 }
 
+/* --- PLAYLIST DETAIL VIEW --- */
+.pd-header-content {
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  margin-top: 10px;
+}
+
+.pd-art {
+  width: 90px;
+  height: 90px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.05);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 2.5rem;
+  margin-right: 20px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+  overflow: hidden;
+}
+
+.pd-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.pd-info h2 {
+  margin: 0 0 5px 0;
+  font-size: 1.5rem;
+  color: #fff;
+  line-height: 1.2;
+}
+
+.pd-info p {
+  margin: 0;
+  color: #56CCF2;
+  font-size: 0.95rem;
+  font-weight: 600;
+}

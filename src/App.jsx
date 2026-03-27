@@ -61,6 +61,9 @@ function App() {
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const playlistFileInputRef = useRef(null);
   const [editingPlaylistId, setEditingPlaylistId] = useState(null);
+  // NEW: Detail View State
+  const [currentPlaylist, setCurrentPlaylist] = useState(null);
+  const [playlistSongs, setPlaylistSongs] = useState([]);
 
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -123,6 +126,48 @@ function App() {
       setNewPlaylistName('');
       if (songForPlaylist) await handleAddSongToPlaylist(data[0].id, songForPlaylist.id);
     }
+  };
+  // --- NEW: OPEN PLAYLIST LOGIC ---
+  const handleOpenLikedMusic = () => {
+    setCurrentPlaylist({ id: 'liked', name: 'Liked Music', isAuto: true });
+    // Filter the main songs array for favorites
+    setPlaylistSongs(songs.filter(s => s.is_favorite)); 
+    navigateTo('playlist-detail');
+  };
+
+  const handleOpenPlaylist = async (playlist) => {
+    setCurrentPlaylist(playlist);
+    setPlaylistSongs([]); // Clear previous songs while loading
+    navigateTo('playlist-detail');
+
+    // Fetch the songs joined through the junction table
+    const { data, error } = await supabase
+      .from('playlist_songs')
+      .select('songs(*)')
+      .eq('playlist_id', playlist.id);
+
+    if (data) {
+      // Clean up the returned data structure
+      const extractedSongs = data.map(item => item.songs).filter(Boolean);
+      setPlaylistSongs(extractedSongs);
+    }
+  };
+
+  const handleRemoveFromPlaylist = async (e, songId) => {
+    e.stopPropagation();
+    if (!currentPlaylist) return;
+
+    if (currentPlaylist.isAuto) {
+      // If it's Liked Music, just unfavorite it!
+      const song = songs.find(s => s.id === songId);
+      if (song) handleToggleFavorite(song);
+      setPlaylistSongs(prev => prev.filter(s => s.id !== songId));
+    } else {
+      // Remove the connection in the database
+      await supabase.from('playlist_songs').delete().match({ playlist_id: currentPlaylist.id, song_id: songId });
+      setPlaylistSongs(prev => prev.filter(s => s.id !== songId));
+    }
+    setActiveMenu(null);
   };
 
   const handleAddSongToPlaylist = async (playlistId, songId) => {
@@ -713,7 +758,77 @@ function App() {
             </div>
           </div>
         )}
+        {/* --- NEW: PLAYLIST DETAIL VIEW --- */}
+        {activeTab === 'playlist-detail' && currentPlaylist && (
+          <div className="app-container">
+            <div className="sticky-playlist-wrapper" style={{ paddingBottom: '15px' }}>
+              <button className="back-btn" onClick={() => navigateTo('playlists')} style={{ padding: '5px 20px', color: '#56CCF2' }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                <span style={{ fontSize: '1.1rem', fontWeight: '600', marginLeft: '5px' }}>Back</span>
+              </button>
+              
+              <div className="pd-header-content">
+                <div className={`pd-art ${currentPlaylist.isAuto ? 'liked-music-art' : ''}`}>
+                  {currentPlaylist.isAuto ? '❤️' : currentPlaylist.cover_url ? (
+                    <img src={currentPlaylist.cover_url} alt="cover" className="playlist-list-img" />
+                  ) : '💽'}
+                </div>
+                <div className="pd-info">
+                  <h2>{currentPlaylist.name}</h2>
+                  <p>{playlistSongs.length} {playlistSongs.length === 1 ? 'Song' : 'Songs'}</p>
+                </div>
+              </div>
+            </div>
 
+            <div className="song-list">
+              {playlistSongs.length === 0 ? (
+                <div className="empty-state"><h3>It's quiet here...</h3><p>Add some songs to this playlist!</p></div>
+              ) : (
+                playlistSongs.map((song, index) => {
+                  const isThisPlaying = currentSong && currentSong.audio_url === song.audio_url;
+                  const uniqueId = `pd-${song.id || index}`;
+
+                  return (
+                    <div key={uniqueId} className={`list-item ${isThisPlaying ? 'active' : ''}`}>
+                      <div className="list-clickable-area" onClick={() => handlePlayPause(song)}>
+                        <div className="drag-handle" style={{ fontSize: '1rem', color: '#444' }}>{index + 1}</div>
+                        {song.cover_url ? (<img src={song.cover_url} alt="cover" className="list-art" />) : (<div className="list-art placeholder">🎵</div>)}
+                        <div className="list-info">
+                          <div className="list-title">{song.title || 'Unknown Audio'}</div>
+                          <div className="list-subtitle">
+                            {song.artist && <span>{song.artist}</span>}
+                            {isThisPlaying && <span className="list-time-counter">{currentTimeFormatted} / {song.duration || '0:00'}</span>}
+                          </div>
+                          {isThisPlaying && <div className="list-progress-bar"><div className="list-progress-fill" style={{ width: `${progress}%` }}></div></div>}
+                        </div>
+                      </div>
+
+                      <div className="list-actions">
+                        {isThisPlaying && <button className="list-stop-btn" onClick={handleStop}><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>}
+                        <div className="list-status">
+                          {isThisPlaying && isPlaying ? <svg className="playing-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#56CCF2" strokeWidth="2" strokeLinecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg> : <span className="duration-text">{song.duration || '--:--'}</span>}
+                        </div>
+
+                        <div className="menu-container">
+                          <button className="menu-btn" onClick={(e) => toggleMenu(e, uniqueId)}>⋮</button>
+                          {activeMenu === uniqueId && (
+                            /* Notice we are using menuDirection here so the bug stays squashed! */
+                            <div className={`dropdown-menu ${menuDirection === 'up' ? 'dropdown-upward' : ''}`}>
+                              <div className="dropdown-item" onClick={(e) => handleGoToDetails(e, song)}>📄 Go to Details</div>
+                              <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); handleToggleFavorite(song); }}>❤️ {song.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div>
+                              {/* NEW: Remove from this specific playlist! */}
+                              <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={(e) => handleRemoveFromPlaylist(e, song.id)}>🗑 Remove from Playlist</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </div>
+        )}
         {/* NEW: THE PLAYLISTS TAB UI (YouTube Music Style) */}
         {activeTab === 'playlists' && (
           <div className="app-container">
@@ -752,7 +867,7 @@ function App() {
             <div className="playlists-list-view">
               
               {/* --- NEW: PINNED "LIKED MUSIC" AUTO-PLAYLIST --- */}
-              <div className="playlist-list-item" onClick={() => alert("Opening Liked Music logic coming next!")}>
+              <div className="playlist-list-item" onClick={handleOpenLikedMusic}>
                 <div className="playlist-list-art liked-music-art">
                   ❤️
                 </div>
@@ -771,7 +886,7 @@ function App() {
               )}
               
               {sortedPlaylists.map((playlist, index) => (
-                <div key={playlist.id} className="playlist-list-item" onClick={() => alert("Opening playlist songs logic coming next!")}>
+                <div key={playlist.id} className="playlist-list-item" onClick={() => handleOpenPlaylist(playlist)}>
                   
                   <div className="playlist-list-art">
                     {isUploading && editingPlaylistId === playlist.id ? (
