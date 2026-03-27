@@ -398,7 +398,7 @@ function App() {
       }
     }
   }
-  
+
 
   const handleSeekBackward = () => { if (audioRef.current) audioRef.current.currentTime -= 10; }
   const handleSeekForward = () => { if (audioRef.current) audioRef.current.currentTime += 10; }
@@ -804,7 +804,7 @@ function App() {
         {activeTab === 'playlist-detail' && currentPlaylist && (
           <div className="app-container">
             <div className="sticky-playlist-wrapper" style={{ paddingBottom: '15px' }}>
-              <button className="back-btn" onClick={() => navigateTo('playlists')} style={{ padding: '5px 20px', color: '#56CCF2' }}>
+              <button className="back-btn" onClick={() => { setCurrentPlaylist(null); navigateTo('playlists'); }} style={{ padding: '5px 20px', color: '#56CCF2' }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                 <span style={{ fontSize: '1.1rem', fontWeight: '600', marginLeft: '5px' }}>Back</span>
               </button>
@@ -1086,7 +1086,10 @@ function App() {
         <button className={`footer-btn ${activeTab === 'artists' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'artists')}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
         </button>
-        <button className={`footer-btn ${activeTab === 'playlists' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'playlists')}>
+        <button 
+          className={`footer-btn ${(activeTab === 'playlists' || activeTab === 'playlist-detail') ? 'active-tab' : ''}`} 
+          onClick={(e) => handleFooterNavigation(e, currentPlaylist ? 'playlist-detail' : 'playlists')}
+        >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
         </button>
         <button className={`footer-btn ${showSearch ? 'active-tab' : ''}`} onClick={(e) => { e.stopPropagation(); navigateTo('list'); setShowSearch(!showSearch); }}>
