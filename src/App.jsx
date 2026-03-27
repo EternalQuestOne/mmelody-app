@@ -66,6 +66,7 @@ function App() {
   const [playlistSongs, setPlaylistSongs] = useState([]);
   const [showAddSongsModal, setShowAddSongsModal] = useState(false); // NEW: Controls the Add Songs modal
   const [modalSearchTerm, setModalSearchTerm] = useState('');
+  const [queueContext, setQueueContext] = useState('main'); // NEW: Remembers which list is playing
 
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -328,8 +329,12 @@ function App() {
     }
   }
 
-  const handlePlayPause = (song) => {
+  const handlePlayPause = (song, context = queueContext) => {
     if (!audioRef.current) return;
+    
+    // NEW: The app remembers where this song was started from!
+    setQueueContext(context);
+
     if (currentSong && currentSong.audio_url === song.audio_url) {
       if (isPlaying) { audioRef.current.pause(); setIsPlaying(false); }
       else { audioRef.current.play().catch(e => console.error(e)); setIsPlaying(true); }
@@ -349,6 +354,7 @@ function App() {
     if (sortOrder === 'oldest') return new Date(a.created_at) - new Date(b.created_at);
     return new Date(b.created_at) - new Date(a.created_at);
   });
+  
   // NEW: Sorting logic applied to the playlists array
   const sortedPlaylists = [...playlists].sort((a, b) => {
     if (playlistSortOrder === 'az') return (a.name || '').localeCompare(b.name || '');
@@ -358,22 +364,40 @@ function App() {
   });
 
   const handlePreviousSong = () => {
-    if (!sortedSongs.length || !currentSong) return;
-    const currentIndex = sortedSongs.findIndex(s => s.audio_url === currentSong.audio_url);
+    // Dynamically chooses the array based on where the user started playing
+    const currentList = queueContext === 'playlist' ? playlistSongs : sortedSongs;
+    if (!currentList.length || !currentSong) return;
+    
+    const currentIndex = currentList.findIndex(s => s.audio_url === currentSong.audio_url);
     if (currentIndex > 0) { 
-      handlePlayPause(sortedSongs[currentIndex - 1]); 
+      handlePlayPause(currentList[currentIndex - 1], queueContext); 
     } else { 
-      handlePlayPause(sortedSongs[sortedSongs.length - 1]); 
+      handlePlayPause(currentList[currentList.length - 1], queueContext); 
     }
   }
 
   const handleNextSong = () => {
-    if (!sortedSongs.length || !currentSong) return;
+    const currentList = queueContext === 'playlist' ? playlistSongs : sortedSongs;
+    if (!currentList.length || !currentSong) return;
+    
     if (isShuffle) {
-      const randomIndex = Math.floor(Math.random() * sortedSongs.length);
-      handlePlayPause(sortedSongs[randomIndex]);
+      const randomIndex = Math.floor(Math.random() * currentList.length);
+      handlePlayPause(currentList[randomIndex], queueContext);
       return; 
     }
+    
+    const currentIndex = currentList.findIndex(s => s.audio_url === currentSong.audio_url);
+    if (currentIndex < currentList.length - 1) { 
+      handlePlayPause(currentList[currentIndex + 1], queueContext); 
+    } else { 
+      // FIX 1: Stop playing if we reach the end of a playlist!
+      if (queueContext === 'playlist') {
+        handleStop(); 
+      } else {
+        handlePlayPause(currentList[0], queueContext); // Otherwise, loop the main library
+      }
+    }
+  }
     const currentIndex = sortedSongs.findIndex(s => s.audio_url === currentSong.audio_url);
     if (currentIndex < sortedSongs.length - 1) { 
       handlePlayPause(sortedSongs[currentIndex + 1]); 
@@ -725,7 +749,7 @@ function App() {
 
                 return (
                   <div key={uniqueId} className={`list-item ${isThisPlaying ? 'active' : ''} ${isSelected ? 'selected-row' : ''}`}>
-                    <div className="list-clickable-area" onClick={() => isSelectionMode ? toggleSelection(song.id) : handlePlayPause(song)}>
+                    <div className="list-clickable-area" onClick={() => isSelectionMode ? toggleSelection(song.id) : handlePlayPause(song, 'main')}>
                       {isSelectionMode ? (
                         <div className={`custom-checkbox ${isSelected ? 'checked' : ''}`}></div>
                       ) : (
@@ -821,7 +845,7 @@ function App() {
 
                   return (
                     <div key={uniqueId} className={`list-item ${isThisPlaying ? 'active' : ''}`}>
-                      <div className="list-clickable-area" onClick={() => handlePlayPause(song)}>
+                      <div className="list-clickable-area" onClick={() => handlePlayPause(song, 'playlist')}>
                         <div className="drag-handle" style={{ fontSize: '1rem', color: '#444' }}>{index + 1}</div>
                         {song.cover_url ? (<img src={song.cover_url} alt="cover" className="list-art" />) : (<div className="list-art placeholder">🎵</div>)}
                         <div className="list-info">
