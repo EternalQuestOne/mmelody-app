@@ -398,13 +398,7 @@ function App() {
       }
     }
   }
-    const currentIndex = sortedSongs.findIndex(s => s.audio_url === currentSong.audio_url);
-    if (currentIndex < sortedSongs.length - 1) { 
-      handlePlayPause(sortedSongs[currentIndex + 1]); 
-    } else { 
-      handlePlayPause(sortedSongs[0]); 
-    }
-  }
+  
 
   const handleSeekBackward = () => { if (audioRef.current) audioRef.current.currentTime -= 10; }
   const handleSeekForward = () => { if (audioRef.current) audioRef.current.currentTime += 10; }
