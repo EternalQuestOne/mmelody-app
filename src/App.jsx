@@ -443,7 +443,9 @@ function App() {
     }
     setIsUploading(false);
     setUploadProgressText('');
-    event.target.value = null; 
+    
+    // Safely check if the input is currently mounted before clearing it!
+    if (fileInputRef.current) fileInputRef.current.value = null; 
   }
 
   const filteredSongs = sortedSongs.filter(song =>
@@ -849,6 +851,14 @@ function App() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* --- NEW: GLOBAL BACKGROUND UPLOAD TOAST --- */}
+      {isUploading && uploadProgressText && (
+        <div className="global-upload-toast">
+          <span className="spinner-mini">⏳</span>
+          <span className="toast-text">{uploadProgressText}</span>
         </div>
       )}
 
