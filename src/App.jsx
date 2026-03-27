@@ -998,19 +998,32 @@ function App() {
       {/* --- NEW: GLOBAL BACKGROUND UPLOAD TOAST --- */}
       {isUploading && uploadProgressText && (
         {/* --- NEW: ADD SONGS TO PLAYLIST MODAL --- */}
+      {/* --- NEW: ADD SONGS TO PLAYLIST MODAL --- */}
       {showAddSongsModal && (
-        <div className="modal-overlay" onClick={() => setShowAddSongsModal(false)}>
+        <div className="modal-overlay" onClick={() => { setShowAddSongsModal(false); setModalSearchTerm(''); }}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Add Songs to {currentPlaylist?.name}</h3>
-              <button className="close-modal" onClick={() => setShowAddSongsModal(false)}>×</button>
+              <button className="close-modal" onClick={() => { setShowAddSongsModal(false); setModalSearchTerm(''); }}>×</button>
             </div>
             
-            <div className="playlist-options" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-              {songs.length === 0 ? (
-                <p className="no-playlists-text">No songs in your library yet.</p>
+            {/* The Modal Search Bar */}
+            <div className="modal-search-container">
+              <input
+                type="text"
+                placeholder="Search songs or artists..."
+                className="modal-search-input"
+                value={modalSearchTerm}
+                onChange={(e) => setModalSearchTerm(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className="playlist-options" style={{ maxHeight: '55vh', overflowY: 'auto' }}>
+              {filteredModalSongs.length === 0 ? (
+                <p className="no-playlists-text">No songs found.</p>
               ) : (
-                songs.map(song => {
+                filteredModalSongs.map(song => {
                   const isAlreadyAdded = playlistSongs.some(s => s.id === song.id);
                   return (
                     <div key={song.id} className="playlist-option-row" onClick={() => handleAddSongFromDetail(song)} style={{ opacity: isAlreadyAdded ? 0.5 : 1 }}>
@@ -1027,6 +1040,9 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* --- GLOBAL UPLOAD TOAST --- */}
+      {isUploading && uploadProgressText && (
         <div className="global-upload-toast">
           <span className="spinner-mini">⏳</span>
           <span className="toast-text">{uploadProgressText}</span>
