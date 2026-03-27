@@ -958,6 +958,7 @@ function App() {
         )}
       </div>
 
+      {/* 1. ORIGINAL ADD TO PLAYLIST MODAL */}
       {showPlaylistModal && (
         <div className="modal-overlay" onClick={() => setShowPlaylistModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -995,10 +996,7 @@ function App() {
         </div>
       )}
 
-      {/* --- NEW: GLOBAL BACKGROUND UPLOAD TOAST --- */}
-      {isUploading && uploadProgressText && (
-        {/* --- NEW: ADD SONGS TO PLAYLIST MODAL --- */}
-      {/* --- NEW: ADD SONGS TO PLAYLIST MODAL --- */}
+      {/* 2. NEW: ADD SONGS TO PLAYLIST MODAL (FROM DETAIL VIEW) */}
       {showAddSongsModal && (
         <div className="modal-overlay" onClick={() => { setShowAddSongsModal(false); setModalSearchTerm(''); }}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -1007,7 +1005,6 @@ function App() {
               <button className="close-modal" onClick={() => { setShowAddSongsModal(false); setModalSearchTerm(''); }}>×</button>
             </div>
             
-            {/* The Modal Search Bar */}
             <div className="modal-search-container">
               <input
                 type="text"
@@ -1041,7 +1038,7 @@ function App() {
         </div>
       )}
 
-      {/* --- GLOBAL UPLOAD TOAST --- */}
+      {/* 3. GLOBAL UPLOAD TOAST */}
       {isUploading && uploadProgressText && (
         <div className="global-upload-toast">
           <span className="spinner-mini">⏳</span>
@@ -1049,6 +1046,7 @@ function App() {
         </div>
       )}
 
+      {/* 4. FOOTER NAVBAR */}
       <nav className="bottom-footer">
         <button className={`footer-btn ${activeTab === 'list' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'list')}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
