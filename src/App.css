@@ -678,3 +678,22 @@ body {
   font-size: 0.95rem;
   font-weight: 600;
 }
+/* --- PLAYLIST DETAIL: ADD SONGS BUTTON --- */
+.add-songs-btn {
+  margin-top: 8px;
+  background: rgba(86, 204, 242, 0.15); /* Soft neon blue glow */
+  color: #56CCF2;
+  border: 1px solid #56CCF2;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  width: max-content;
+  transition: all 0.2s ease;
+}
+
+.add-songs-btn:active {
+  background: #56CCF2;
+  color: #000;
+}

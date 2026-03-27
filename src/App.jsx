@@ -64,6 +64,7 @@ function App() {
   // NEW: Detail View State
   const [currentPlaylist, setCurrentPlaylist] = useState(null);
   const [playlistSongs, setPlaylistSongs] = useState([]);
+  const [showAddSongsModal, setShowAddSongsModal] = useState(false); // NEW: Controls the Add Songs modal
 
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -168,6 +169,24 @@ function App() {
       setPlaylistSongs(prev => prev.filter(s => s.id !== songId));
     }
     setActiveMenu(null);
+  };
+
+  // NEW: Instantly adds a song directly to the currently open playlist
+  const handleAddSongFromDetail = async (song) => {
+    // Prevent adding duplicates
+    if (playlistSongs.some(s => s.id === song.id)) {
+      alert("This song is already in the playlist!");
+      return;
+    }
+
+    const { error } = await supabase.from('playlist_songs').insert([{ playlist_id: currentPlaylist.id, song_id: song.id }]);
+    
+    if (!error || error.code === '23505') { // 23505 is the safe Postgres "already exists" error
+      setPlaylistSongs(prev => [...prev, song]); // Instantly updates your UI without reloading!
+      setShowAddSongsModal(false); // Closes the modal
+    } else {
+      console.error("Error adding to playlist:", error);
+    }
   };
 
   const handleAddSongToPlaylist = async (playlistId, songId) => {
@@ -776,6 +795,13 @@ function App() {
                 <div className="pd-info">
                   <h2>{currentPlaylist.name}</h2>
                   <p>{playlistSongs.length} {playlistSongs.length === 1 ? 'Song' : 'Songs'}</p>
+                  
+                  {/* NEW: Only show the Add button if it's a custom playlist! */}
+                  {!currentPlaylist.isAuto && (
+                    <button className="add-songs-btn" onClick={() => setShowAddSongsModal(true)}>
+                      + Add Songs
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -971,6 +997,36 @@ function App() {
 
       {/* --- NEW: GLOBAL BACKGROUND UPLOAD TOAST --- */}
       {isUploading && uploadProgressText && (
+        {/* --- NEW: ADD SONGS TO PLAYLIST MODAL --- */}
+      {showAddSongsModal && (
+        <div className="modal-overlay" onClick={() => setShowAddSongsModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Add Songs to {currentPlaylist?.name}</h3>
+              <button className="close-modal" onClick={() => setShowAddSongsModal(false)}>×</button>
+            </div>
+            
+            <div className="playlist-options" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+              {songs.length === 0 ? (
+                <p className="no-playlists-text">No songs in your library yet.</p>
+              ) : (
+                songs.map(song => {
+                  const isAlreadyAdded = playlistSongs.some(s => s.id === song.id);
+                  return (
+                    <div key={song.id} className="playlist-option-row" onClick={() => handleAddSongFromDetail(song)} style={{ opacity: isAlreadyAdded ? 0.5 : 1 }}>
+                      <div className="pl-art-mini">
+                        {song.cover_url ? <img src={song.cover_url} alt="cover" /> : '🎵'}
+                      </div>
+                      <span className="pl-name">{song.title || 'Unknown Song'}</span>
+                      <span className="pl-add-icon">{isAlreadyAdded ? '✓' : '+'}</span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
         <div className="global-upload-toast">
           <span className="spinner-mini">⏳</span>
           <span className="toast-text">{uploadProgressText}</span>
