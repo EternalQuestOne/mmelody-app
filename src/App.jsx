@@ -65,6 +65,7 @@ function App() {
   const [currentPlaylist, setCurrentPlaylist] = useState(null);
   const [playlistSongs, setPlaylistSongs] = useState([]);
   const [showAddSongsModal, setShowAddSongsModal] = useState(false); // NEW: Controls the Add Songs modal
+  const [modalSearchTerm, setModalSearchTerm] = useState('');
 
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -516,6 +517,10 @@ function App() {
     (song.title && song.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (song.artist && song.artist.toLowerCase().includes(searchTerm.toLowerCase()))
   )
+  const filteredModalSongs = songs.filter(song =>
+    (song.title && song.title.toLowerCase().includes(modalSearchTerm.toLowerCase())) ||
+    (song.artist && song.artist.toLowerCase().includes(modalSearchTerm.toLowerCase()))
+  );
 
   const toggleSelection = (id) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);

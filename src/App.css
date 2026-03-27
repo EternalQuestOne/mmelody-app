@@ -697,3 +697,28 @@ body {
   background: #56CCF2;
   color: #000;
 }
+/* --- MODAL SEARCH BAR --- */
+.modal-search-container {
+  padding: 10px 15px 5px 15px;
+}
+
+.modal-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 8px;
+  outline: none;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+}
+
+.modal-search-input::placeholder {
+  color: #888;
+}
+
+.modal-search-input:focus {
+  border-color: #56CCF2;
+}
