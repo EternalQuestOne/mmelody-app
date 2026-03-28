@@ -400,7 +400,7 @@ function App() {
     }
   }
 
-  const handleNextSong = () => {
+const handleNextSong = () => {
     const currentList = queueContext === 'playlist' ? playlistSongs : sortedSongs;
     if (!currentList.length || !currentSong) return;
     
@@ -423,7 +423,7 @@ function App() {
     }
   }
 
-
+  
   const handleSeekBackward = () => { if (audioRef.current) audioRef.current.currentTime -= 10; }
   const handleSeekForward = () => { if (audioRef.current) audioRef.current.currentTime += 10; }
   
