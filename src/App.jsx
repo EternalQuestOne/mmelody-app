@@ -372,7 +372,7 @@ function App() {
   const handlePlayPause = (song, context = queueContext) => {
     if (!audioRef.current) return;
     
-    // NEW: The app remembers where this song was started from!
+    // The app remembers where this song was started from!
     setQueueContext(context);
 
     if (currentSong && currentSong.audio_url === song.audio_url) {
@@ -381,11 +381,14 @@ function App() {
     } else {
       setCurrentSong(song);
       setIsPlaying(true);
+      
+      // CRITICAL NEW LINES: Force the playhead and UI to reset to 0:00
+      audioRef.current.currentTime = 0;
+      setProgress(0);
+      setCurrentTimeFormatted('0:00');
+
       audioRef.current.src = song.audio_url;
-      
-      // CRITICAL NEW LINE: Forces aggressive background buffering
       audioRef.current.preload = "auto"; 
-      
       audioRef.current.load(); 
       audioRef.current.play().catch(e => { console.error("Playback blocked:", e); setIsPlaying(false); });
     }
