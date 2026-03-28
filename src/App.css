@@ -27,15 +27,6 @@ body {
   min-height: 100vh;
 }
 
-.app-root { 
-  width: 100%; 
-  display: flex; 
-  flex-direction: column;
-  justify-content: flex-start; 
-  align-items: center;
-  min-height: 100vh;
-}
-
 .main-content-area {
   width: 100%;
   max-width: 500px;
@@ -89,8 +80,9 @@ body {
   font-family: 'Varela Round', 'Nunito', 'Segoe UI', sans-serif; /* Smooth, rounded font style */
   background: linear-gradient(90deg, #56CCF2, #2F80ED); /* Deepened the blue slightly to match the neon vibe */
   -webkit-background-clip: text; 
+  background-clip: text;
   -webkit-text-fill-color: transparent; 
-  letter-spacing: -1px; /* Pulls the letters a bit closer together */
+  letter-spacing: -1px;
 }
 
 @keyframes logo-pulse {
@@ -435,6 +427,7 @@ body {
   opacity: 0; /* CRITICAL: Makes it completely invisible! */
   cursor: pointer;
   -webkit-appearance: none;
+  appearance: none;
   z-index: 10; /* Ensures it sits on top of the blue fill */
   margin: 0;
 }
