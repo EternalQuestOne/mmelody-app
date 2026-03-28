@@ -371,26 +371,24 @@ function App() {
 
   const handlePlayPause = (song, context = queueContext) => {
     if (!audioRef.current) return;
-    
-    // The app remembers where this song was started from!
     setQueueContext(context);
 
     if (currentSong && currentSong.audio_url === song.audio_url) {
-      if (isPlaying) { audioRef.current.pause(); setIsPlaying(false); }
-      else { audioRef.current.play().catch(e => console.error(e)); setIsPlaying(true); }
+      // If tapping the same song, just toggle pause/play
+      if (isPlaying) { 
+        audioRef.current.pause(); 
+        setIsPlaying(false); 
+      } else { 
+        audioRef.current.play().catch(e => console.error(e)); 
+        setIsPlaying(true); 
+      }
     } else {
-      setCurrentSong(song);
-      setIsPlaying(true);
-      
-      // CRITICAL NEW LINES: Force the playhead and UI to reset to 0:00
-      audioRef.current.currentTime = 0;
+      // NEW: For a new song, just update the state! 
+      // The <audio> tag's autoPlay property will natively handle the rest.
       setProgress(0);
       setCurrentTimeFormatted('0:00');
-
-      audioRef.current.src = song.audio_url;
-      audioRef.current.preload = "auto"; 
-      audioRef.current.load(); 
-      audioRef.current.play().catch(e => { console.error("Playback blocked:", e); setIsPlaying(false); });
+      setCurrentSong(song);
+      setIsPlaying(true);
     }
     setActiveMenu(null); 
   }
@@ -595,11 +593,15 @@ const handleNextSong = () => {
     <div className="app-root" onClick={() => setActiveMenu(null)}> 
       <audio 
         ref={audioRef} 
+        src={currentSong?.audio_url || ''}
+        autoPlay={isPlaying}
         onEnded={handleNextSong} 
         onTimeUpdate={handleTimeUpdate}
-        onStalled={() => { if (isPlaying) audioRef.current.play(); }}
-        onError={() => setTimeout(() => handleNextSong(), 2000)}
-        preload="auto"
+        onStalled={() => { if (isPlaying && audioRef.current) audioRef.current.play().catch(()=>{}); }}
+        onError={(e) => {
+          console.error("Audio Error:", e);
+          if (isPlaying) setTimeout(() => handleNextSong(), 2000);
+        }}
       />
       {/* NEW: Invisible shield that blocks clicks from hitting songs underneath */}
       {activeMenu && (
