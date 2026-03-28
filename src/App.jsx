@@ -85,6 +85,30 @@ function App() {
     return () => window.removeEventListener('popstate', handleHardwareBack);
   }, []);
 
+  // --- NEW: BACKGROUND PLAYBACK FIX (Media Session API) ---
+  useEffect(() => {
+    if ('mediaSession' in navigator && currentSong) {
+      // 1. Tell the mobile OS what is playing so it stays awake in sleep mode!
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentSong.title || 'Unknown Title',
+        artist: currentSong.artist || 'Unknown Artist',
+        artwork: currentSong.cover_url ? [
+          { src: currentSong.cover_url, sizes: '512x512', type: 'image/png' }
+        ] : []
+      });
+
+      // 2. Connect your phone's lock-screen buttons directly to the app
+      navigator.mediaSession.setActionHandler('play', () => {
+        if (audioRef.current) { audioRef.current.play(); setIsPlaying(true); }
+      });
+      navigator.mediaSession.setActionHandler('pause', () => {
+        if (audioRef.current) { audioRef.current.pause(); setIsPlaying(false); }
+      });
+      navigator.mediaSession.setActionHandler('previoustrack', () => handlePreviousSong());
+      navigator.mediaSession.setActionHandler('nexttrack', () => handleNextSong());
+    }
+  }, [currentSong, queueContext, playlistSongs, songs, isShuffle]);
+
   const navigateTo = (newTab) => {
     if (activeTab === newTab) return;
     setActiveTab(newTab);
