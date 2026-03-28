@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.vercel.mmelody_app.twa",
+        "sha256_cert_fingerprints": ["61:97:73:48:ED:82:EA:B2:E4:BA:BD:59:90:EF:33:50:75:D4:B7:F9:FD:F3:99:6C:1B:A3:E6:CF:17:A8:8E:5A"]
+      }
+    }]
