@@ -109,6 +109,22 @@ function App() {
     }
   }, [currentSong, queueContext, playlistSongs, songs, isShuffle]);
 
+  useEffect(() => {
+    let wakeLock = null;
+    const requestWakeLock = async () => {
+      try {
+        if ('wakeLock' in navigator && isPlaying) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (err) { console.error("WakeLock Error:", err); }
+    };
+
+    if (isPlaying) { requestWakeLock(); } 
+    else if (wakeLock) { wakeLock.release(); wakeLock = null; }
+
+    return () => { if (wakeLock) wakeLock.release(); };
+  }, [isPlaying]);
+
   const navigateTo = (newTab) => {
     if (activeTab === newTab) return;
     setActiveTab(newTab);
@@ -366,6 +382,10 @@ function App() {
       setCurrentSong(song);
       setIsPlaying(true);
       audioRef.current.src = song.audio_url;
+      
+      // CRITICAL NEW LINE: Forces aggressive background buffering
+      audioRef.current.preload = "auto"; 
+      
       audioRef.current.load(); 
       audioRef.current.play().catch(e => { console.error("Playback blocked:", e); setIsPlaying(false); });
     }
@@ -570,7 +590,14 @@ const handleNextSong = () => {
 
   return (
     <div className="app-root" onClick={() => setActiveMenu(null)}> 
-      <audio ref={audioRef} onEnded={handleNextSong} onTimeUpdate={handleTimeUpdate} />
+      <audio 
+        ref={audioRef} 
+        onEnded={handleNextSong} 
+        onTimeUpdate={handleTimeUpdate}
+        onStalled={() => { if (isPlaying) audioRef.current.play(); }}
+        onError={() => setTimeout(() => handleNextSong(), 2000)}
+        preload="auto"
+      />
       {/* NEW: Invisible shield that blocks clicks from hitting songs underneath */}
       {activeMenu && (
         <div className="menu-backdrop" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); }}></div>
