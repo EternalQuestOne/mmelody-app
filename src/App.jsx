@@ -597,11 +597,6 @@ const handleNextSong = () => {
         autoPlay={isPlaying}
         onEnded={handleNextSong} 
         onTimeUpdate={handleTimeUpdate}
-        onStalled={() => { if (isPlaying && audioRef.current) audioRef.current.play().catch(()=>{}); }}
-        onError={(e) => {
-          console.error("Audio Error:", e);
-          if (isPlaying) setTimeout(() => handleNextSong(), 2000);
-        }}
       />
       {/* NEW: Invisible shield that blocks clicks from hitting songs underneath */}
       {activeMenu && (
