@@ -690,16 +690,13 @@ const handleNextSong = () => {
     // If a song has no album tag, group it under "Unknown Album"
     const albumName = song.album ? song.album.trim() : 'Unknown Album';
     if (!acc[albumName]) {
-      acc[albumName] = { name: albumName, cover_url: song.cover_url, songs: [] };
-    }
-    // If the album doesn't have a cover yet, but this song does, use it!
-    if (!acc[albumName].cover_url && song.cover_url) {
-      acc[albumName].cover_url = song.cover_url; 
+      // STRICTLY use custom uploaded art. NEVER use ID3 tags for album covers.
+      acc[albumName] = { name: albumName, cover_url: customAlbumArts[albumName] || null, songs: [] };
     }
     acc[albumName].songs.push(song);
     return acc;
   }, {});
-  
+ 
   // Convert the map into an array and sort it alphabetically A-Z
   const albumsList = Object.values(albumsMap).sort((a, b) => a.name.localeCompare(b.name));
 
@@ -1227,22 +1224,26 @@ const handleNextSong = () => {
                 {albumsList.map((album, index) => (
                   <div key={`al-${index}`} style={{ display: 'flex', flexDirection: 'column', position: 'relative', background: 'rgba(255,255,255,0.03)', padding: '8px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
                     
-                    {/* 3-Dot Menu overlay for custom Album Art */}
-                    <div style={{ position: 'absolute', top: '2px', right: '2px', zIndex: 10 }}>
-                      <button className="menu-btn" style={{ background: 'rgba(0,0,0,0.6)', width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0' }} onClick={(e) => toggleMenu(e, `al-${album.name}`)}>⋮</button>
-                      {activeMenu === `al-${album.name}` && (
-                        <div className="dropdown-menu" style={{ right: '0', top: '26px', minWidth: '140px' }}>
-                          <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); triggerAlbumCoverUpload(album.name); }}>
-                            🖼 {customAlbumArts[album.name] ? 'Change Art' : 'Add Art'}
-                          </div>
-                          {customAlbumArts[album.name] && (
-                            <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleDeleteAlbumCover(e, album.name); }}>
-                              🗑 Remove Art
-                            </div>
-                          )}
-                        </div>
-                      )}
+                    {/* ENHANCED 3-Dot Menu Button */}
+                    <div style={{ position: 'absolute', top: '4px', right: '4px', zIndex: 10 }}>
+                      <button className="menu-btn" style={{ background: 'rgba(0,0,0,0.75)', color: '#fff', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0', border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }} onClick={(e) => toggleMenu(e, `al-${album.name}`)}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                      </button>
                     </div>
+
+                    {/* Centered Dropdown Menu relative to the CARD, not the button, to avoid clipping! */}
+                    {activeMenu === `al-${album.name}` && (
+                      <div className="dropdown-menu" style={{ left: '50%', transform: 'translateX(-50%)', top: '36px', minWidth: '150px', zIndex: 100 }}>
+                        <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); triggerAlbumCoverUpload(album.name); }}>
+                          🖼 {customAlbumArts[album.name] ? 'Change Art' : 'Add Art'}
+                        </div>
+                        {customAlbumArts[album.name] && (
+                          <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleDeleteAlbumCover(e, album.name); }}>
+                            🗑 Remove Art
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <div onClick={() => handleOpenAlbum(album)} style={{ cursor: 'pointer' }}>
                       <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: '6px', overflow: 'hidden', marginBottom: '8px', backgroundColor: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1268,8 +1269,6 @@ const handleNextSong = () => {
             )}
           </div>
         )}
-
-        {['queue', 'artists', 'genres'].includes(activeTab) && (
           <div className="empty-state"><h3>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h3><p>This architecture is coming soon!</p></div>
         )}
       </div>
