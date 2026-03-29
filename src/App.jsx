@@ -1221,7 +1221,12 @@ const handleNextSong = () => {
 
         {/* 4. Playlist */}
         <button className={`footer-btn ${(activeTab === 'playlists' || activeTab === 'playlist-detail') ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, currentPlaylist ? 'playlist-detail' : 'playlists')}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 8h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z"></path><path d="M4 16V4a2 2 0 0 1 2-2h12"></path><path d="M12 12v4a2 2 0 1 0 2 2v-4h2"></path></svg>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 8v10a2 2 0 0 0 2 2h10"></path>
+            <rect x="8" y="4" width="12" height="12" rx="2" ry="2"></rect>
+            <path d="M14.5 12.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"></path>
+            <path d="M14.5 12.5V7l2.5 1"></path>
+          </svg>
         </button>
 
         {/* 5. Artist */}
