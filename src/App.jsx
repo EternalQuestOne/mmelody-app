@@ -36,8 +36,8 @@ function App() {
     cloudinaryName: localStorage.getItem('cloudinaryName') || ''
   });
 
-  // NEW: Check if all three keys exist
-  const isConfigured = credentials.supabaseUrl && credentials.supabaseAnonKey && credentials.cloudinaryName;
+  // NEW: Check if all three keys are physically SAVED in the device memory
+  const isConfigured = localStorage.getItem('supabaseUrl') && localStorage.getItem('supabaseAnonKey') && localStorage.getItem('cloudinaryName');
   
   const [songs, setSongs] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
