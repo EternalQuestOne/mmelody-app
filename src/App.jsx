@@ -1027,7 +1027,13 @@ function App() {
             {activeTab === 'playlist-detail' && currentPlaylist && (
               <div className="app-container">
                 <div className="sticky-playlist-wrapper" style={{ paddingBottom: '15px' }}>
-                  <button className="back-btn" onClick={() => { setCurrentPlaylist(null); navigateTo('playlists'); }} style={{ padding: '5px 20px', color: '#56CCF2' }}>
+                  
+                  {/* DYNAMIC BACK BUTTON */}
+                  <button className="back-btn" onClick={() => { 
+                      const targetTab = currentPlaylist.isAlbum ? 'albums' : 'playlists';
+                      setCurrentPlaylist(null); 
+                      navigateTo(targetTab); 
+                    }} style={{ padding: '5px 20px', color: '#56CCF2' }}>
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                     <span style={{ fontSize: '1.1rem', fontWeight: '600', marginLeft: '5px' }}>Back</span>
                   </button>
