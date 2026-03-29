@@ -1217,42 +1217,6 @@ const handleNextSong = () => {
               </header>
             </div>
             
-            {albumsList.length === 0 ? (
-              <div className="empty-state"><p>No albums found.</p></div>
-            ) : (
-              <div className="tag-grid" style={{ padding: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '15px' }}>
-                {albumsList.map((album, index) => (
-                  <div key={index} onClick={() => handleOpenAlbum(album)} style={{ display: 'flex', flexDirection: 'column', cursor: 'pointer', background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: '8px', overflow: 'hidden', marginBottom: '10px', backgroundColor: '#222', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {album.cover_url ? (
-                        <img src={album.cover_url} alt={album.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        <span style={{ fontSize: '2.5rem' }}>💿</span>
-                      )}
-                    </div>
-                    <div style={{ fontWeight: '600', fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {album.name}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '4px' }}>
-                      {album.songs.length} {album.songs.length === 1 ? 'song' : 'songs'}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* --- NEW: ALBUMS TAB --- */}
-        {activeTab === 'albums' && (
-          <div className="app-container">
-            <div className="sticky-playlist-wrapper">
-              <header className="ocean-header">
-                <div className="ocean-glow"></div>
-                <h2 className="ocean-title">Albums</h2>
-              </header>
-            </div>
-            
             {/* Hidden input for Album Art */}
             <input type="file" accept="image/*" ref={albumFileInputRef} onChange={handleAlbumCoverUpload} style={{ display: 'none' }} />
 
