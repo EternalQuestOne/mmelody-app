@@ -6,8 +6,6 @@ import './App.css'
 // NEW: Importing your generated energetic logo asset!
 import logoImage from './logo.png' // Save image_0.png as logo.png in your src folder
 
-const CLOUDINARY_CLOUD_NAME = 'dexx3rdkl';
-
 const extractTagText = (frame) => {
   if (!frame) return '';
   if (typeof frame === 'string') return frame;
@@ -32,6 +30,15 @@ const extractPublicId = (url) => {
 };
 
 function App() {
+  const [credentials, setCredentials] = useState({
+    supabaseUrl: localStorage.getItem('supabaseUrl') || '',
+    supabaseAnonKey: localStorage.getItem('supabaseAnonKey') || '',
+    cloudinaryName: localStorage.getItem('cloudinaryName') || ''
+  });
+
+  // NEW: Check if all three keys exist
+  const isConfigured = credentials.supabaseUrl && credentials.supabaseAnonKey && credentials.cloudinaryName;
+  
   const [songs, setSongs] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [currentSong, setCurrentSong] = useState(null)
@@ -141,19 +148,24 @@ function App() {
   };
 
   useEffect(() => { 
-    getSongs();
-    getPlaylists();
-  }, [])
+    // Only try to fetch if we have a valid database connection!
+    if (supabase) {
+      getSongs();
+      getPlaylists();
+    }
+  }, [])
 
-  async function getSongs() {
-    const { data } = await supabase.from('songs').select('*').order('created_at', { ascending: false })
-    if (data) setSongs(data)
-  }
+  async function getSongs() {
+    if (!supabase) return;
+    const { data, error } = await supabase.from('songs').select('*').order('created_at', { ascending: false })
+    if (data) setSongs(data)
+  }
 
-  async function getPlaylists() {
-    const { data } = await supabase.from('playlists').select('*').order('created_at', { ascending: false })
-    if (data) setPlaylists(data)
-  }
+  async function getPlaylists() {
+    if (!supabase) return;
+    const { data, error } = await supabase.from('playlists').select('*').order('created_at', { ascending: false })
+    if (data) setPlaylists(data)
+  }
 
   const handleOpenPlaylistModal = (song) => {
     setSongForPlaylist(song);
@@ -263,7 +275,7 @@ function App() {
       const imgFormData = new FormData();
       imgFormData.append('file', file);
       imgFormData.append('upload_preset', 'mMelody_preset');
-      const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: imgFormData });
+      const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${credentials.cloudinaryName}/image/upload`, { method: 'POST', body: imgFormData });
       const newCoverUrl = (await imgRes.json()).secure_url;
 
       const { data } = await supabase.from('playlists').update({ cover_url: newCoverUrl }).eq('id', editingPlaylistId).select();
@@ -531,14 +543,14 @@ const handleNextSong = () => {
                   const imgFormData = new FormData();
                   imgFormData.append('file', blob);
                   imgFormData.append('upload_preset', 'mMelody_preset');
-                  const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: imgFormData });
+                  const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${credentials.cloudinaryName}/image/upload`, { method: 'POST', body: imgFormData });
                   coverUrl = (await imgRes.json()).secure_url;
                 }
 
                 const audioFormData = new FormData();
                 audioFormData.append('file', file);
                 audioFormData.append('upload_preset', 'mMelody_preset');
-                const audioRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/video/upload`, { method: 'POST', body: audioFormData });
+                const audioRes = await fetch(`https://api.cloudinary.com/v1_1/${credentials.cloudinaryName}/video/upload`, { method: 'POST', body: audioFormData });
                 const audioUrl = (await audioRes.json()).secure_url;
 
                 const newSong = {
@@ -590,7 +602,64 @@ const handleNextSong = () => {
   }
 
   return (
-    <div className="app-root" onClick={() => setActiveMenu(null)}> 
+    <div className="app-root" onClick={() => setActiveMenu(null)}> 
+
+      {/* --- NEW: THE WELCOME / SETTINGS GATEWAY --- */}
+      {(!isConfigured || activeTab === 'settings') && (
+        <div className="app-container" style={{ padding: '30px 20px', textAlign: 'center', marginTop: '40px' }}>
+          <div className="pd-header-content" style={{ flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+            <div className="playlist-art-placeholder" style={{ fontSize: '3rem', width: '80px', height: '80px' }}>⚙️</div>
+            <h2>{isConfigured ? 'App Settings' : 'Welcome to mMelody'}</h2>
+            <p style={{ color: '#888', marginBottom: '20px', fontSize: '0.9rem' }}>
+              {isConfigured 
+                ? 'Update your personal cloud connection below.' 
+                : 'To keep your music 100% private and free, please enter your personal database keys.'}
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '400px', margin: '0 auto' }}>
+            <input 
+              type="text" placeholder="Supabase Project URL" className="standalone-playlist-input"
+              value={credentials.supabaseUrl}
+              onChange={(e) => setCredentials({...credentials, supabaseUrl: e.target.value})}
+            />
+            <input 
+              type="password" placeholder="Supabase Anon Key" className="standalone-playlist-input"
+              value={credentials.supabaseAnonKey}
+              onChange={(e) => setCredentials({...credentials, supabaseAnonKey: e.target.value})}
+            />
+            <input 
+              type="text" placeholder="Cloudinary Cloud Name" className="standalone-playlist-input"
+              value={credentials.cloudinaryName}
+              onChange={(e) => setCredentials({...credentials, cloudinaryName: e.target.value})}
+            />
+            
+            <button className="upload-btn" style={{ marginTop: '20px' }} onClick={() => {
+              if (!credentials.supabaseUrl || !credentials.supabaseAnonKey || !credentials.cloudinaryName) {
+                alert("Please fill in all three fields!");
+                return;
+              }
+              localStorage.setItem('supabaseUrl', credentials.supabaseUrl.trim());
+              localStorage.setItem('supabaseAnonKey', credentials.supabaseAnonKey.trim());
+              localStorage.setItem('cloudinaryName', credentials.cloudinaryName.trim());
+              alert("Settings Saved! Restarting to connect to your database...");
+              window.location.reload(); 
+            }}>
+              Save & Connect
+            </button>
+            
+            {isConfigured && (
+              <button className="create-btn" style={{ background: 'transparent', border: '1px solid #444' }} onClick={() => navigateTo('list')}>
+                Cancel
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* --- THE REST OF THE APP IS HIDDEN UNTIL CONFIGURED --- */}
+      {isConfigured && (
+        <> 
       <audio 
         ref={audioRef} 
         src={currentSong?.audio_url || ''}
@@ -1145,8 +1214,13 @@ const handleNextSong = () => {
         </button>
         <button className={`footer-btn ${showSearch ? 'active-tab' : ''}`} onClick={(e) => { e.stopPropagation(); navigateTo('list'); setShowSearch(!showSearch); }}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          </button>
+        <button className={`footer-btn ${activeTab === 'settings' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'settings')}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
         </button>
       </nav>
+      </>
+      )}
     </div>
   )
 }

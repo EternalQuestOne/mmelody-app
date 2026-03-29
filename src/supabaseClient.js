@@ -1,6 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = 'https://uhzpkkvbowcznneplicp.supabase.co';
-const supabaseKey = 'sb_publishable_WI_GgaI2DjRd8Gn9KPUuUg_i1iblfec';
+const supabaseUrl = localStorage.getItem('supabaseUrl');
+const supabaseAnonKey = localStorage.getItem('supabaseAnonKey');
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = (supabaseUrl && supabaseAnonKey) 
+  ? createClient(supabaseUrl, supabaseAnonKey) 
+  : null;
