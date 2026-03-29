@@ -36,7 +36,6 @@ function App() {
     cloudinaryName: localStorage.getItem('cloudinaryName') || ''
   });
 
-  // NEW: Check if all three keys are physically SAVED in the device memory
   const isConfigured = localStorage.getItem('supabaseUrl') && localStorage.getItem('supabaseAnonKey') && localStorage.getItem('cloudinaryName');
   
   const [songs, setSongs] = useState([])
@@ -58,18 +57,18 @@ function App() {
   const [uploadProgressText, setUploadProgressText] = useState('')
   const [showMoreDetails, setShowMoreDetails] = useState(false) 
   const [activeMenu, setActiveMenu] = useState(null)
-  const [menuDirection, setMenuDirection] = useState('down') // NEW: Tracks which way the menu should open
+  const [menuDirection, setMenuDirection] = useState('down')
   
   // Playlist State Variables
   const [playlists, setPlaylists] = useState([]);
-  const [playlistSortOrder, setPlaylistSortOrder] = useState('newest'); // NEW: Playlist Sorting
+  const [playlistSortOrder, setPlaylistSortOrder] = useState('newest');
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [songForPlaylist, setSongForPlaylist] = useState(null);
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const playlistFileInputRef = useRef(null);
   const [editingPlaylistId, setEditingPlaylistId] = useState(null);
 
-  // NEW: Album State & Dictionary
+  // Album State & Dictionary
   const albumFileInputRef = useRef(null);
   const [editingAlbumName, setEditingAlbumName] = useState(null);
   const [customAlbumArts, setCustomAlbumArts] = useState(() => {
@@ -77,12 +76,12 @@ function App() {
     catch { return {}; }
   });
 
-  // NEW: Detail View State
+  // Detail View State
   const [currentPlaylist, setCurrentPlaylist] = useState(null);
   const [playlistSongs, setPlaylistSongs] = useState([]);
-  const [showAddSongsModal, setShowAddSongsModal] = useState(false); // NEW: Controls the Add Songs modal
+  const [showAddSongsModal, setShowAddSongsModal] = useState(false); 
   const [modalSearchTerm, setModalSearchTerm] = useState('');
-  const [queueContext, setQueueContext] = useState('main'); // NEW: Remembers which list is playing
+  const [queueContext, setQueueContext] = useState('main'); 
 
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -101,10 +100,8 @@ function App() {
     return () => window.removeEventListener('popstate', handleHardwareBack);
   }, []);
 
-  // --- NEW: BACKGROUND PLAYBACK FIX (Media Session API) ---
   useEffect(() => {
     if ('mediaSession' in navigator && currentSong) {
-      // 1. Tell the mobile OS what is playing so it stays awake in sleep mode!
       navigator.mediaSession.metadata = new MediaMetadata({
         title: currentSong.title || 'Unknown Title',
         artist: currentSong.artist || 'Unknown Artist',
@@ -113,7 +110,6 @@ function App() {
         ] : []
       });
 
-      // 2. Connect your phone's lock-screen buttons directly to the app
       navigator.mediaSession.setActionHandler('play', () => {
         if (audioRef.current) { audioRef.current.play(); setIsPlaying(true); }
       });
@@ -124,22 +120,6 @@ function App() {
       navigator.mediaSession.setActionHandler('nexttrack', () => handleNextSong());
     }
   }, [currentSong, queueContext, playlistSongs, songs, isShuffle]);
-
-  useEffect(() => {
-    let wakeLock = null;
-    const requestWakeLock = async () => {
-      try {
-        if ('wakeLock' in navigator && isPlaying) {
-          wakeLock = await navigator.wakeLock.request('screen');
-        }
-      } catch (err) { console.error("WakeLock Error:", err); }
-    };
-
-    if (isPlaying) { requestWakeLock(); } 
-    else if (wakeLock) { wakeLock.release(); wakeLock = null; }
-
-    return () => { if (wakeLock) wakeLock.release(); };
-  }, [isPlaying]);
 
   const navigateTo = (newTab) => {
     if (activeTab === newTab) return;
@@ -157,7 +137,6 @@ function App() {
   };
 
   useEffect(() => { 
-    // Only try to fetch if we have a valid database connection!
     if (supabase) {
       getSongs();
       getPlaylists();
@@ -191,27 +170,24 @@ function App() {
       if (songForPlaylist) await handleAddSongToPlaylist(data[0].id, songForPlaylist.id);
     }
   };
-  // --- NEW: OPEN PLAYLIST LOGIC ---
+
   const handleOpenLikedMusic = () => {
     setCurrentPlaylist({ id: 'liked', name: 'Liked Music', isAuto: true });
-    // Filter the main songs array for favorites
     setPlaylistSongs(songs.filter(s => s.is_favorite)); 
     navigateTo('playlist-detail');
   };
 
   const handleOpenPlaylist = async (playlist) => {
     setCurrentPlaylist(playlist);
-    setPlaylistSongs([]); // Clear previous songs while loading
+    setPlaylistSongs([]); 
     navigateTo('playlist-detail');
 
-    // Fetch the songs joined through the junction table
     const { data, error } = await supabase
       .from('playlist_songs')
       .select('songs(*)')
       .eq('playlist_id', playlist.id);
 
     if (data) {
-      // Clean up the returned data structure
       const extractedSongs = data.map(item => item.songs).filter(Boolean);
       setPlaylistSongs(extractedSongs);
     }
@@ -222,21 +198,17 @@ function App() {
     if (!currentPlaylist) return;
 
     if (currentPlaylist.isAuto) {
-      // If it's Liked Music, just unfavorite it!
       const song = songs.find(s => s.id === songId);
       if (song) handleToggleFavorite(song);
       setPlaylistSongs(prev => prev.filter(s => s.id !== songId));
     } else {
-      // Remove the connection in the database
       await supabase.from('playlist_songs').delete().match({ playlist_id: currentPlaylist.id, song_id: songId });
       setPlaylistSongs(prev => prev.filter(s => s.id !== songId));
     }
     setActiveMenu(null);
   };
 
-  // NEW: Instantly adds a song directly to the currently open playlist
   const handleAddSongFromDetail = async (song) => {
-    // Prevent adding duplicates
     if (playlistSongs.some(s => s.id === song.id)) {
       alert("This song is already in the playlist!");
       return;
@@ -244,9 +216,9 @@ function App() {
 
     const { error } = await supabase.from('playlist_songs').insert([{ playlist_id: currentPlaylist.id, song_id: song.id }]);
     
-    if (!error || error.code === '23505') { // 23505 is the safe Postgres "already exists" error
-      setPlaylistSongs(prev => [...prev, song]); // Instantly updates your UI without reloading!
-      setShowAddSongsModal(false); // Closes the modal
+    if (!error || error.code === '23505') { 
+      setPlaylistSongs(prev => [...prev, song]); 
+      setShowAddSongsModal(false); 
     } else {
       console.error("Error adding to playlist:", error);
     }
@@ -334,7 +306,7 @@ function App() {
     finally { setIsUploading(false); setUploadProgressText(''); }
   };
 
-  // --- NEW: ALBUM ART HANDLERS ---
+  // ALBUM ART HANDLERS
   const triggerAlbumCoverUpload = (albumName) => {
     setEditingAlbumName(albumName);
     albumFileInputRef.current.click();
@@ -348,21 +320,18 @@ function App() {
     setUploadProgressText("Uploading album art...");
 
     try {
-      // If an old custom cover exists, delete it from the server first
       const oldCoverUrl = customAlbumArts[editingAlbumName];
       if (oldCoverUrl) {
         const oldCoverId = extractPublicId(oldCoverUrl);
         if (oldCoverId) await fetch('/api/deleteImage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ public_id: oldCoverId })});
       }
 
-      // Upload new image to Cloudinary
       const imgFormData = new FormData();
       imgFormData.append('file', file);
       imgFormData.append('upload_preset', 'mMelody_preset');
       const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${credentials.cloudinaryName}/image/upload`, { method: 'POST', body: imgFormData });
       const newCoverUrl = (await imgRes.json()).secure_url;
 
-      // Update the Local Dictionary (Leaves database songs untouched!)
       const newDict = { ...customAlbumArts, [editingAlbumName]: newCoverUrl };
       setCustomAlbumArts(newDict);
       localStorage.setItem('customAlbumArts', JSON.stringify(newDict));
@@ -390,7 +359,6 @@ function App() {
         if (coverId) await fetch('/api/deleteImage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ public_id: coverId })});
       }
       
-      // Remove from dictionary
       const newDict = { ...customAlbumArts };
       delete newDict[albumName];
       setCustomAlbumArts(newDict);
@@ -453,14 +421,11 @@ function App() {
     setCurrentTimeFormatted('0:00');
   }
 
-  // NEW: Hard Exit Function
   const handleExitApp = () => {
     if (window.confirm("Stop playback and exit mMelody?")) {
       handleStop();
       setCurrentSong(null);
-      // Try to physically close the PWA window
       try { window.close(); } catch (e) { console.log(e); }
-      // Fallback: put the app in a blank/sleep state
       setActiveTab('settings'); 
     }
   };
@@ -470,7 +435,6 @@ function App() {
     setQueueContext(context);
 
     if (currentSong && currentSong.audio_url === song.audio_url) {
-      // If tapping the same song, just toggle pause/play
       if (isPlaying) { 
         audioRef.current.pause(); 
         setIsPlaying(false); 
@@ -479,8 +443,6 @@ function App() {
         setIsPlaying(true); 
       }
     } else {
-      // NEW: For a new song, just update the state! 
-      // The <audio> tag's autoPlay property will natively handle the rest.
       setProgress(0);
       setCurrentTimeFormatted('0:00');
       setCurrentSong(song);
@@ -496,16 +458,14 @@ function App() {
     return new Date(b.created_at) - new Date(a.created_at);
   });
   
-  // NEW: Sorting logic applied to the playlists array
   const sortedPlaylists = [...playlists].sort((a, b) => {
     if (playlistSortOrder === 'az') return (a.name || '').localeCompare(b.name || '');
     if (playlistSortOrder === 'za') return (b.name || '').localeCompare(a.name || '');
     if (playlistSortOrder === 'oldest') return new Date(a.created_at) - new Date(b.created_at);
-    return new Date(b.created_at) - new Date(a.created_at); // default/newest
+    return new Date(b.created_at) - new Date(a.created_at); 
   });
 
   const handlePreviousSong = () => {
-    // Dynamically chooses the array based on where the user started playing
     const currentList = queueContext === 'playlist' ? playlistSongs : sortedSongs;
     if (!currentList.length || !currentSong) return;
     
@@ -517,7 +477,7 @@ function App() {
     }
   }
 
-const handleNextSong = () => {
+  const handleNextSong = () => {
     const currentList = queueContext === 'playlist' ? playlistSongs : sortedSongs;
     if (!currentList.length || !currentSong) return;
     
@@ -531,16 +491,14 @@ const handleNextSong = () => {
     if (currentIndex < currentList.length - 1) { 
       handlePlayPause(currentList[currentIndex + 1], queueContext); 
     } else { 
-      // FIX 1: Stop playing if we reach the end of a playlist!
       if (queueContext === 'playlist') {
         handleStop(); 
       } else {
-        handlePlayPause(currentList[0], queueContext); // Otherwise, loop the main library
+        handlePlayPause(currentList[0], queueContext); 
       }
     }
   }
 
-  
   const handleSeekBackward = () => { if (audioRef.current) audioRef.current.currentTime -= 10; }
   const handleSeekForward = () => { if (audioRef.current) audioRef.current.currentTime += 10; }
   
@@ -581,7 +539,6 @@ const handleNextSong = () => {
     if (activeMenu === id) {
       setActiveMenu(null);
     } else {
-      // NEW: Calculate if the tap happened in the lower half of the user's screen
       const isBottomHalf = e.clientY > (window.innerHeight / 2);
       setMenuDirection(isBottomHalf ? 'up' : 'down');
       setActiveMenu(id);
@@ -668,7 +625,6 @@ const handleNextSong = () => {
     setIsUploading(false);
     setUploadProgressText('');
     
-    // Safely check if the input is currently mounted before clearing it!
     if (fileInputRef.current) fileInputRef.current.value = null; 
   }
 
@@ -685,23 +641,19 @@ const handleNextSong = () => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   }
 
-// --- NEW: ALBUM GROUPING LOGIC ---
+  // ALBUM GROUPING LOGIC
   const albumsMap = songs.reduce((acc, song) => {
-    // If a song has no album tag, group it under "Unknown Album"
     const albumName = song.album ? song.album.trim() : 'Unknown Album';
     if (!acc[albumName]) {
-      // STRICTLY use custom uploaded art. NEVER use ID3 tags for album covers.
       acc[albumName] = { name: albumName, cover_url: customAlbumArts[albumName] || null, songs: [] };
     }
     acc[albumName].songs.push(song);
     return acc;
   }, {});
- 
-  // Convert the map into an array and sort it alphabetically A-Z
+  
   const albumsList = Object.values(albumsMap).sort((a, b) => a.name.localeCompare(b.name));
 
   const handleOpenAlbum = (album) => {
-    // We trick the app into thinking the Album is an "Auto Playlist"
     setCurrentPlaylist({ id: `album-${album.name}`, name: album.name, isAuto: true, isAlbum: true, cover_url: album.cover_url });
     setPlaylistSongs(album.songs); 
     navigateTo('playlist-detail');
@@ -710,7 +662,7 @@ const handleNextSong = () => {
   return (
     <div className="app-root" onClick={() => setActiveMenu(null)}> 
 
-      {/* --- NEW: THE WELCOME / SETTINGS GATEWAY --- */}
+      {/* --- THE WELCOME / SETTINGS GATEWAY --- */}
       {(!isConfigured || activeTab === 'settings') && (
         <div className="app-container" style={{ padding: '30px 20px', textAlign: 'center', marginTop: '40px' }}>
           <div className="pd-header-content" style={{ flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
@@ -745,7 +697,10 @@ const handleNextSong = () => {
                 alert("Please fill in all three fields!");
                 return;
               }
-              localStorage.setItem('supabaseUrl', credentials.supabaseUrl.trim());
+              let fixedUrl = credentials.supabaseUrl.trim();
+              if (!fixedUrl.startsWith('http')) fixedUrl = 'https://' + fixedUrl;
+
+              localStorage.setItem('supabaseUrl', fixedUrl);
               localStorage.setItem('supabaseAnonKey', credentials.supabaseAnonKey.trim());
               localStorage.setItem('cloudinaryName', credentials.cloudinaryName.trim());
               alert("Settings Saved! Restarting to connect to your database...");
@@ -766,683 +721,674 @@ const handleNextSong = () => {
       {/* --- THE REST OF THE APP IS HIDDEN UNTIL CONFIGURED --- */}
       {isConfigured && (
         <> 
-      <audio 
-        ref={audioRef} 
-        src={currentSong?.audio_url || ''}
-        autoPlay={isPlaying}
-        onEnded={handleNextSong} 
-        onTimeUpdate={handleTimeUpdate}
-      />
-      {/* NEW: Invisible shield that blocks clicks from hitting songs underneath */}
-      {activeMenu && (
-        <div className="menu-backdrop" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); }}></div>
-      )}
+          <audio 
+            ref={audioRef} 
+            src={currentSong?.audio_url || ''}
+            autoPlay={isPlaying}
+            onEnded={handleNextSong} 
+            onTimeUpdate={handleTimeUpdate}
+          />
+          {activeMenu && (
+            <div className="menu-backdrop" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); }}></div>
+          )}
 
-      <div className="main-content-area">
-        {activeTab === 'detail' && (
-          currentSong ? (
-            <div className="detail-view-container">
-              <button className="back-btn" onClick={() => navigateTo('list')}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-              </button>
-
-              <div className="detail-art-container">
-                {currentSong.cover_url ? (
-                  <img src={currentSong.cover_url} alt="cover" className="detail-art" />
-                ) : (
-                  <div className="detail-art placeholder-large">🎵</div>
-                )}
-              </div>
-              
-              <div className="scrolling-wrapper">
-                <div className="scrolling-text">
-                  <span className="scroll-title">{currentSong.title || 'Unknown Title'}</span>
-                  {currentSong.artist && <span className="scroll-artist"> • {currentSong.artist}</span>}
-                </div>
-              </div>
-
-              <div className="detail-interaction-row">
-                <button className={`detail-inter-btn ${isShuffle ? 'active-info' : ''}`} onClick={() => setIsShuffle(!isShuffle)} title="Toggle Shuffle">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="16 3 21 3 21 8"></polyline>
-                    <line x1="4" y1="20" x2="21" y2="3"></line>
-                    <polyline points="21 16 21 21 16 21"></polyline>
-                    <line x1="15" y1="15" x2="21" y2="21"></line>
-                    <line x1="4" y1="4" x2="9" y2="9"></line>
-                  </svg>
-                </button>
-
-                <button className={`detail-inter-btn ${currentSong.is_favorite ? 'favorite-filled' : ''}`} onClick={() => handleToggleFavorite(currentSong)}>
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill={currentSong.is_favorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-                </button>
-
-                <button className="detail-inter-btn" onClick={() => handleOpenPlaylistModal(currentSong)}>
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zM2 16h8v-2H2v2zm14-1v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4z"/>
-                  </svg>
-                </button>
-
-                <button className="detail-inter-btn" onClick={() => alert("Add to Queue logic coming soon!")} title="Play Next in Queue">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="4" y1="6" x2="20" y2="6"></line>
-                    <line x1="4" y1="12" x2="20" y2="12"></line>
-                    <line x1="4" y1="18" x2="11" y2="18"></line>
-                    <polyline points="15 15 18 18 15 21"></polyline>
-                    <line x1="11" y1="18" x2="18" y2="18"></line>
-                  </svg>
-                </button>
-                
-                <button className={`detail-inter-btn ${showMoreDetails ? 'active-info' : ''}`} onClick={handleOpenInfo}>
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-                  </svg>
-                </button>
-              </div>
-              
-              <div className="detail-progress-container">
-                <div className="progress-bar-bg" style={{ position: 'relative' }}>
-                  <div className="progress-bar-fill" style={{ width: `${progress}%` }}></div>
-                  <input 
-                    type="range" 
-                    min="0" 
-                    max="100" 
-                    step="0.1"
-                    value={progress || 0} 
-                    onChange={handleSeek}
-                    className="progress-scrubber"
-                  />
-                </div>
-                <div className="time-row">
-                  <span>{currentTimeFormatted}</span>
-                  <span>{currentSong.duration || '0:00'}</span>
-                </div>
-              </div>
-
-              <div className="detail-playback-controls-bar">
-                <button className="pro-ctrl-btn" onClick={handleSeekBackward}>
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/>
-                  </svg>
-                </button>
-                <button className="pro-ctrl-btn" onClick={handlePreviousSong}><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
-                <button className="pro-ctrl-btn master-play-pause-btn" onClick={() => handlePlayPause(currentSong)}>
-                  {isPlaying ? (
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
-                  ) : (
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
-                  )}
-                </button>
-                <button className="pro-ctrl-btn master-stop-btn" onClick={handleStop}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-                </button>
-                <button className="pro-ctrl-btn" onClick={handleNextSong}><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6zm10-12h2v12h-2z"/></svg></button>
-                <button className="pro-ctrl-btn" onClick={handleSeekForward}>
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6-8.5-6z"/>
-                  </svg>
-                </button>
-              </div>
-
-              <div className="more-details-wrapper" ref={moreDetailsRef}>
-                <button className="more-details-btn" onClick={() => setShowMoreDetails(!showMoreDetails)}>
-                  {showMoreDetails ? 'Hide Details' : 'More Details'}
-                </button>
-                {showMoreDetails && (
-                  <div className="more-details-content">
-                    <div className="tag-grid">
-                      <div className="tag-item"><span>Title:</span> {currentSong.title || 'Unknown'}</div>
-                      <div className="tag-item"><span>Artist:</span> {currentSong.artist || 'Unknown'}</div>
-                      <div className="tag-item"><span>Subtitle:</span> {currentSong.subtitle || 'Unknown'}</div>
-                      <div className="tag-item"><span>Album:</span> {currentSong.album || 'Unknown'}</div>
-                      <div className="tag-item"><span>Year:</span> {currentSong.release_year || 'Unknown'}</div>
-                      <div className="tag-item"><span>Composer:</span> {currentSong.composer || 'Unknown'}</div>
-                      <div className="tag-item"><span>Lyricist:</span> {currentSong.lyricist || 'Unknown'}</div>
-                      <div className="tag-item"><span>Genre:</span> {currentSong.genre || 'Unknown'}</div>
-                      <div className="tag-item"><span>Comment:</span> {currentSong.comment || 'None'}</div>
-                    </div>
-                    {currentSong.lyrics ? (
-                      <div className="lyrics-box"><h4>Lyrics</h4><p>{currentSong.lyrics}</p></div>
-                    ) : (
-                      <div className="lyrics-box"><p style={{color: '#888', fontStyle: 'italic'}}>No lyrics embedded in this file.</p></div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="empty-state"><h3>No song selected</h3><p>Play a song from the list view to see details.</p></div>
-          )
-        )}
-
-        {activeTab === 'list' && (
-          <div className="app-container">
-            <header className="header attractive-header">
-              <div className="header-bg-glow"></div>
-              <div className="brand-header-wrapper">
-                  <img src={logoImage} alt="mMelody logo" className="app-logo" />
-                  <h2>mMelody</h2>
-              </div>
-              
-              <div className="upload-container">
-                <button className="upload-btn" onClick={() => fileInputRef.current.click()} disabled={isUploading}>
-                  {isUploading ? `⏳ ${uploadProgressText}` : 'Upload Music'}
-                </button>
-                <input type="file" accept="audio/mpeg, audio/mp3" multiple ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} />
-              </div>
-
-              <div className="selection-toolbar">
-                <div className="toolbar-left">
-                  <button className="action-icon-btn" onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }}>
-                    {isSelectionMode ? 'Cancel' : 'Select'}
+          <div className="main-content-area">
+            {/* DETAIL VIEW */}
+            {activeTab === 'detail' && (
+              currentSong ? (
+                <div className="detail-view-container">
+                  <button className="back-btn" onClick={() => navigateTo('list')}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                   </button>
-                  {isSelectionMode && selectedIds.length > 0 && (
-                    <button className="delete-btn-red" onClick={handleDeleteSelected}>
-                      Delete ({selectedIds.length})
-                    </button>
-                  )}
-                </div>
-                <select className="sort-select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
-                  <option value="newest">Newest First</option>
-                  <option value="oldest">Oldest First</option>
-                  <option value="az">A-Z (Title)</option>
-                  <option value="za">Z-A (Title)</option>
-                </select>
-              </div>
 
-              {showSearch && (
-                <input
-                  type="text"
-                  placeholder="Search songs or artists..."
-                  className="search-bar animate-search"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  autoFocus
-                />
-              )}
-            </header>
-            
-            <div className="song-list">
-              {filteredSongs.map((song, index) => {
-                const isThisPlaying = currentSong && currentSong.audio_url === song.audio_url;
-                const uniqueId = song.id || index;
-                const isSelected = selectedIds.includes(song.id); 
-
-                return (
-                  <div key={uniqueId} className={`list-item ${isThisPlaying ? 'active' : ''} ${isSelected ? 'selected-row' : ''}`}>
-                    <div className="list-clickable-area" onClick={() => isSelectionMode ? toggleSelection(song.id) : handlePlayPause(song, 'main')}>
-                      {isSelectionMode ? (
-                        <div className={`custom-checkbox ${isSelected ? 'checked' : ''}`}></div>
-                      ) : (
-                        <div className="drag-handle">=</div>
-                      )}
-                      
-                      {song.cover_url ? (<img src={song.cover_url} alt="cover" className="list-art" />) : (<div className="list-art placeholder">🎵</div>)}
-                      <div className="list-info">
-                        <div className="list-title">{song.title || 'Unknown Audio'}</div>
-                        <div className="list-subtitle">
-                          {song.artist && <span>{song.artist}</span>}
-                          {isThisPlaying && (
-                            <span className="list-time-counter">
-                              {currentTimeFormatted} / {song.duration || '0:00'}
-                            </span>
-                          )}
-                        </div>
-                        {isThisPlaying && (
-                          <div className="list-progress-bar"><div className="list-progress-fill" style={{ width: `${progress}%` }}></div></div>
-                          )}
-                      </div>
+                  <div className="detail-art-container">
+                    {currentSong.cover_url ? (
+                      <img src={currentSong.cover_url} alt="cover" className="detail-art" />
+                    ) : (
+                      <div className="detail-art placeholder-large">🎵</div>
+                    )}
+                  </div>
+                  
+                  <div className="scrolling-wrapper">
+                    <div className="scrolling-text">
+                      <span className="scroll-title">{currentSong.title || 'Unknown Title'}</span>
+                      {currentSong.artist && <span className="scroll-artist"> • {currentSong.artist}</span>}
                     </div>
+                  </div>
 
-                    {!isSelectionMode && (
-                      <div className="list-actions">
-                        {isThisPlaying && (
-                          <button className="list-stop-btn" onClick={handleStop}>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-                          </button>
+                  <div className="detail-interaction-row">
+                    <button className={`detail-inter-btn ${isShuffle ? 'active-info' : ''}`} onClick={() => setIsShuffle(!isShuffle)} title="Toggle Shuffle">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="16 3 21 3 21 8"></polyline>
+                        <line x1="4" y1="20" x2="21" y2="3"></line>
+                        <polyline points="21 16 21 21 16 21"></polyline>
+                        <line x1="15" y1="15" x2="21" y2="21"></line>
+                        <line x1="4" y1="4" x2="9" y2="9"></line>
+                      </svg>
+                    </button>
+
+                    <button className={`detail-inter-btn ${currentSong.is_favorite ? 'favorite-filled' : ''}`} onClick={() => handleToggleFavorite(currentSong)}>
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill={currentSong.is_favorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                    </button>
+
+                    <button className="detail-inter-btn" onClick={() => handleOpenPlaylistModal(currentSong)}>
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zM2 16h8v-2H2v2zm14-1v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4z"/>
+                      </svg>
+                    </button>
+
+                    <button className="detail-inter-btn" onClick={() => alert("Add to Queue logic coming soon!")} title="Play Next in Queue">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="4" y1="6" x2="20" y2="6"></line>
+                        <line x1="4" y1="12" x2="20" y2="12"></line>
+                        <line x1="4" y1="18" x2="11" y2="18"></line>
+                        <polyline points="15 15 18 18 15 21"></polyline>
+                        <line x1="11" y1="18" x2="18" y2="18"></line>
+                      </svg>
+                    </button>
+                    
+                    <button className={`detail-inter-btn ${showMoreDetails ? 'active-info' : ''}`} onClick={handleOpenInfo}>
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                      </svg>
+                    </button>
+                  </div>
+                  
+                  <div className="detail-progress-container">
+                    <div className="progress-bar-bg" style={{ position: 'relative' }}>
+                      <div className="progress-bar-fill" style={{ width: `${progress}%` }}></div>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="100" 
+                        step="0.1"
+                        value={progress || 0} 
+                        onChange={handleSeek}
+                        className="progress-scrubber"
+                      />
+                    </div>
+                    <div className="time-row">
+                      <span>{currentTimeFormatted}</span>
+                      <span>{currentSong.duration || '0:00'}</span>
+                    </div>
+                  </div>
+
+                  <div className="detail-playback-controls-bar">
+                    <button className="pro-ctrl-btn" onClick={handleSeekBackward}>
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/>
+                      </svg>
+                    </button>
+                    <button className="pro-ctrl-btn" onClick={handlePreviousSong}><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
+                    <button className="pro-ctrl-btn master-play-pause-btn" onClick={() => handlePlayPause(currentSong)}>
+                      {isPlaying ? (
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+                      ) : (
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
+                      )}
+                    </button>
+                    <button className="pro-ctrl-btn master-stop-btn" onClick={handleStop}>
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                    </button>
+                    <button className="pro-ctrl-btn" onClick={handleNextSong}><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6zm10-12h2v12h-2z"/></svg></button>
+                    <button className="pro-ctrl-btn" onClick={handleSeekForward}>
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6-8.5-6z"/>
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div className="more-details-wrapper" ref={moreDetailsRef}>
+                    <button className="more-details-btn" onClick={() => setShowMoreDetails(!showMoreDetails)}>
+                      {showMoreDetails ? 'Hide Details' : 'More Details'}
+                    </button>
+                    {showMoreDetails && (
+                      <div className="more-details-content">
+                        <div className="tag-grid">
+                          <div className="tag-item"><span>Title:</span> {currentSong.title || 'Unknown'}</div>
+                          <div className="tag-item"><span>Artist:</span> {currentSong.artist || 'Unknown'}</div>
+                          <div className="tag-item"><span>Subtitle:</span> {currentSong.subtitle || 'Unknown'}</div>
+                          <div className="tag-item"><span>Album:</span> {currentSong.album || 'Unknown'}</div>
+                          <div className="tag-item"><span>Year:</span> {currentSong.release_year || 'Unknown'}</div>
+                          <div className="tag-item"><span>Composer:</span> {currentSong.composer || 'Unknown'}</div>
+                          <div className="tag-item"><span>Lyricist:</span> {currentSong.lyricist || 'Unknown'}</div>
+                          <div className="tag-item"><span>Genre:</span> {currentSong.genre || 'Unknown'}</div>
+                          <div className="tag-item"><span>Comment:</span> {currentSong.comment || 'None'}</div>
+                        </div>
+                        {currentSong.lyrics ? (
+                          <div className="lyrics-box"><h4>Lyrics</h4><p>{currentSong.lyrics}</p></div>
+                        ) : (
+                          <div className="lyrics-box"><p style={{color: '#888', fontStyle: 'italic'}}>No lyrics embedded in this file.</p></div>
                         )}
-                        <div className="list-status">
-                          {isThisPlaying && isPlaying ? (
-                            <svg className="playing-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#56CCF2" strokeWidth="2" strokeLinecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
-                          ) : (<span className="duration-text">{song.duration || '--:--'}</span>)}
-                        </div>
-
-                        <div className="menu-container">
-                          <button className="menu-btn" onClick={(e) => toggleMenu(e, uniqueId)}>⋮</button>
-                          {activeMenu === uniqueId && (
-                            <div className={`dropdown-menu ${menuDirection === 'up' ? 'dropdown-upward' : ''}`}>
-                              <div className="dropdown-item" onClick={(e) => handleGoToDetails(e, song)}>📄 Go to Details</div>
-                              <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); alert("Added to queue!"); }}>⏮ Add to Queue</div>
-                              <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); handleToggleFavorite(song); }}>❤️ {song.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div>
-                              <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); handleOpenPlaylistModal(song); }}>💽 Add to Playlist</div>
-                              <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={() => { setSelectedIds([song.id]); handleDeleteSelected(); }}>🗑 Delete Song</div>
-                            </div>
-                          )}
-                        </div>
                       </div>
                     )}
                   </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-        {/* --- NEW: PLAYLIST DETAIL VIEW --- */}
-        {activeTab === 'playlist-detail' && currentPlaylist && (
-          <div className="app-container">
-            <div className="sticky-playlist-wrapper" style={{ paddingBottom: '15px' }}>
-              <button className="back-btn" onClick={() => { setCurrentPlaylist(null); navigateTo('playlists'); }} style={{ padding: '5px 20px', color: '#56CCF2' }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-                <span style={{ fontSize: '1.1rem', fontWeight: '600', marginLeft: '5px' }}>Back</span>
-              </button>
-              
-              <div className="pd-header-content">
-                <div className={`pd-art ${currentPlaylist.isAuto ? 'liked-music-art' : ''}`}>
-                  {currentPlaylist.isAuto ? '❤️' : currentPlaylist.cover_url ? (
-                    <img src={currentPlaylist.cover_url} alt="cover" className="playlist-list-img" />
-                  ) : '💽'}
                 </div>
-                <div className="pd-info">
-                  <h2>{currentPlaylist.name}</h2>
-                  <p>{playlistSongs.length} {playlistSongs.length === 1 ? 'Song' : 'Songs'}</p>
-                  
-                  {/* NEW: Only show the Add button if it's a custom playlist! */}
-                  {!currentPlaylist.isAuto && (
-                    <button className="add-songs-btn" onClick={() => setShowAddSongsModal(true)}>
-                      + Add Songs
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="song-list">
-              {playlistSongs.length === 0 ? (
-                <div className="empty-state"><h3>It's quiet here...</h3><p>Add some songs to this playlist!</p></div>
               ) : (
-                playlistSongs.map((song, index) => {
-                  const isThisPlaying = currentSong && currentSong.audio_url === song.audio_url;
-                  const uniqueId = `pd-${song.id || index}`;
+                <div className="empty-state"><h3>No song selected</h3><p>Play a song from the list view to see details.</p></div>
+              )
+            )}
 
-                  return (
-                    <div key={uniqueId} className={`list-item ${isThisPlaying ? 'active' : ''}`}>
-                      <div className="list-clickable-area" onClick={() => handlePlayPause(song, 'playlist')}>
-                        <div className="drag-handle" style={{ fontSize: '1rem', color: '#444' }}>{index + 1}</div>
-                        {song.cover_url ? (<img src={song.cover_url} alt="cover" className="list-art" />) : (<div className="list-art placeholder">🎵</div>)}
-                        <div className="list-info">
-                          <div className="list-title">{song.title || 'Unknown Audio'}</div>
-                          <div className="list-subtitle">
-                            {song.artist && <span>{song.artist}</span>}
-                            {isThisPlaying && <span className="list-time-counter">{currentTimeFormatted} / {song.duration || '0:00'}</span>}
-                          </div>
-                          {isThisPlaying && <div className="list-progress-bar"><div className="list-progress-fill" style={{ width: `${progress}%` }}></div></div>}
-                        </div>
-                      </div>
+            {/* LIST VIEW */}
+            {activeTab === 'list' && (
+              <div className="app-container">
+                <header className="header attractive-header">
+                  <div className="header-bg-glow"></div>
+                  <div className="brand-header-wrapper">
+                      <img src={logoImage} alt="mMelody logo" className="app-logo" />
+                      <h2>mMelody</h2>
+                  </div>
+                  
+                  <div className="upload-container">
+                    <button className="upload-btn" onClick={() => fileInputRef.current.click()} disabled={isUploading}>
+                      {isUploading ? `⏳ ${uploadProgressText}` : 'Upload Music'}
+                    </button>
+                    <input type="file" accept="audio/mpeg, audio/mp3" multiple ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} />
+                  </div>
 
-                      <div className="list-actions">
-                        {isThisPlaying && <button className="list-stop-btn" onClick={handleStop}><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>}
-                        <div className="list-status">
-                          {isThisPlaying && isPlaying ? <svg className="playing-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#56CCF2" strokeWidth="2" strokeLinecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg> : <span className="duration-text">{song.duration || '--:--'}</span>}
-                        </div>
+                  <div className="selection-toolbar">
+                    <div className="toolbar-left">
+                      <button className="action-icon-btn" onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }}>
+                        {isSelectionMode ? 'Cancel' : 'Select'}
+                      </button>
+                      {isSelectionMode && selectedIds.length > 0 && (
+                        <button className="delete-btn-red" onClick={handleDeleteSelected}>
+                          Delete ({selectedIds.length})
+                        </button>
+                      )}
+                    </div>
+                    <select className="sort-select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
+                      <option value="newest">Newest First</option>
+                      <option value="oldest">Oldest First</option>
+                      <option value="az">A-Z (Title)</option>
+                      <option value="za">Z-A (Title)</option>
+                    </select>
+                  </div>
 
-                        <div className="menu-container">
-                          <button className="menu-btn" onClick={(e) => toggleMenu(e, uniqueId)}>⋮</button>
-                          {activeMenu === uniqueId && (
-                            /* Notice we are using menuDirection here so the bug stays squashed! */
-                            <div className={`dropdown-menu ${menuDirection === 'up' ? 'dropdown-upward' : ''}`}>
-                              <div className="dropdown-item" onClick={(e) => handleGoToDetails(e, song)}>📄 Go to Details</div>
-                              <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); handleToggleFavorite(song); }}>❤️ {song.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div>
-                              {/* Hide the remove button if we are viewing an Auto-Playlist or Album! */}
-                              {(!currentPlaylist.isAuto && !currentPlaylist.isAlbum) && (
-                                <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={(e) => handleRemoveFromPlaylist(e, song.id)}>🗑 Remove from Playlist</div>
+                  {showSearch && (
+                    <input
+                      type="text"
+                      placeholder="Search songs or artists..."
+                      className="search-bar animate-search"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      autoFocus
+                    />
+                  )}
+                </header>
+                
+                <div className="song-list">
+                  {filteredSongs.map((song, index) => {
+                    const isThisPlaying = currentSong && currentSong.audio_url === song.audio_url;
+                    const uniqueId = song.id || index;
+                    const isSelected = selectedIds.includes(song.id); 
+
+                    return (
+                      <div key={uniqueId} className={`list-item ${isThisPlaying ? 'active' : ''} ${isSelected ? 'selected-row' : ''}`}>
+                        <div className="list-clickable-area" onClick={() => isSelectionMode ? toggleSelection(song.id) : handlePlayPause(song, 'main')}>
+                          {isSelectionMode ? (
+                            <div className={`custom-checkbox ${isSelected ? 'checked' : ''}`}></div>
+                          ) : (
+                            <div className="drag-handle">=</div>
+                          )}
+                          
+                          {song.cover_url ? (<img src={song.cover_url} alt="cover" className="list-art" />) : (<div className="list-art placeholder">🎵</div>)}
+                          <div className="list-info">
+                            <div className="list-title">{song.title || 'Unknown Audio'}</div>
+                            <div className="list-subtitle">
+                              {song.artist && <span>{song.artist}</span>}
+                              {isThisPlaying && (
+                                <span className="list-time-counter">
+                                  {currentTimeFormatted} / {song.duration || '0:00'}
+                                </span>
                               )}
                             </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          </div>
-        )}
-        {/* NEW: THE PLAYLISTS TAB UI (YouTube Music Style) */}
-        {activeTab === 'playlists' && (
-          <div className="app-container">
-            {/* NEW: Sticky Wrapper for Header + Controls */}
-            <div className="sticky-playlist-wrapper">
-              
-              <header className="ocean-header">
-                <div className="ocean-glow"></div>
-                <h2 className="ocean-title">My Playlists</h2>
-              </header>
-
-              <div className="create-standalone-playlist">
-                <input 
-                  type="text" 
-                  placeholder="Name your new playlist..." 
-                  value={newPlaylistName}
-                  onChange={(e) => setNewPlaylistName(e.target.value)}
-                  className="standalone-playlist-input"
-                />
-                <button className="create-btn" onClick={handleCreatePlaylist}>Create</button>
-              </div>
-
-              <div className="selection-toolbar" style={{ padding: '0 15px', marginTop: '-10px', marginBottom: '10px', justifyContent: 'flex-end' }}>
-                <select className="sort-select" value={playlistSortOrder} onChange={(e) => setPlaylistSortOrder(e.target.value)}>
-                  <option value="newest">Newest First</option>
-                  <option value="oldest">Oldest First</option>
-                  <option value="az">A-Z (Name)</option>
-                  <option value="za">Z-A (Name)</option>
-                </select>
-              </div>
-              
-            </div>
-            
-            <input type="file" accept="image/*" ref={playlistFileInputRef} onChange={handlePlaylistCoverUpload} style={{ display: 'none' }} />
-
-            <div className="playlists-list-view">
-              
-              {/* --- NEW: PINNED "LIKED MUSIC" AUTO-PLAYLIST --- */}
-              <div className="playlist-list-item" onClick={handleOpenLikedMusic}>
-                <div className="playlist-list-art liked-music-art">
-                  ❤️
-                </div>
-                <div className="playlist-list-info">
-                  <div className="playlist-list-name">Liked Music</div>
-                  <div style={{ fontSize: '0.8rem', color: '#888', marginTop: '3px' }}>Auto Playlist</div>
-                </div>
-                {/* No 3-dot menu here because it cannot be edited or deleted! */}
-              </div>
-
-              {/* --- CUSTOM PLAYLISTS --- */}
-              {sortedPlaylists.length === 0 && (
-                <div className="empty-state" style={{ paddingTop: '30px' }}>
-                  <p style={{ color: '#888' }}>You haven't created any custom playlists yet.</p>
-                </div>
-              )}
-              
-              {sortedPlaylists.map((playlist, index) => (
-                <div key={playlist.id} className="playlist-list-item" onClick={() => handleOpenPlaylist(playlist)}>
-                  
-                  <div className="playlist-list-art">
-                    {isUploading && editingPlaylistId === playlist.id ? (
-                      <div className="playlist-art-placeholder spinner-pulse">⏳</div>
-                    ) : playlist.cover_url ? (
-                      <img src={playlist.cover_url} alt={playlist.name} className="playlist-list-img" />
-                    ) : (
-                      <div className="playlist-art-placeholder">💽</div>
-                    )}
-                  </div>
-                  
-                  <div className="playlist-list-info">
-                    <div className="playlist-list-name">{playlist.name}</div>
-                  </div>
-                    
-                  <div className="menu-container">
-                    <button className="menu-btn" onClick={(e) => toggleMenu(e, `pl-${playlist.id}`)}>⋮</button>
-                    {activeMenu === `pl-${playlist.id}` && (
-                      <div className={`dropdown-menu ${index >= sortedPlaylists.length - 3 ? 'dropdown-upward' : ''}`} style={{ right: '0' }}>
-                        <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); triggerPlaylistCoverUpload(playlist.id); }}>
-                          🖼 {playlist.cover_url ? 'Change Art' : 'Add Art'}
-                        </div>
-                        {playlist.cover_url && (
-                          <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleDeletePlaylistCover(e, playlist); }}>
-                            🗑 Remove Art
+                            {isThisPlaying && (
+                              <div className="list-progress-bar"><div className="list-progress-fill" style={{ width: `${progress}%` }}></div></div>
+                              )}
                           </div>
-                        )}
-                        <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleDeletePlaylist(playlist); }}>
-                          ❌ Delete Playlist
                         </div>
-                      </div>
-                    )}
-                  </div>
 
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+                        {!isSelectionMode && (
+                          <div className="list-actions">
+                            {isThisPlaying && (
+                              <button className="list-stop-btn" onClick={handleStop}>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                              </button>
+                            )}
+                            <div className="list-status">
+                              {isThisPlaying && isPlaying ? (
+                                <svg className="playing-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#56CCF2" strokeWidth="2" strokeLinecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
+                              ) : (<span className="duration-text">{song.duration || '--:--'}</span>)}
+                            </div>
 
-        {/* --- NEW: ALBUMS TAB --- */}
-        {activeTab === 'albums' && (
-          <div className="app-container">
-            <div className="sticky-playlist-wrapper">
-              <header className="ocean-header">
-                <div className="ocean-glow"></div>
-                <h2 className="ocean-title">Albums</h2>
-              </header>
-            </div>
-            
-            {/* Hidden input for Album Art */}
-            <input type="file" accept="image/*" ref={albumFileInputRef} onChange={handleAlbumCoverUpload} style={{ display: 'none' }} />
-
-            {albumsList.length === 0 ? (
-              <div className="empty-state"><p>No albums found.</p></div>
-            ) : (
-              <div className="tag-grid" style={{ padding: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(85px, 1fr))', gap: '12px' }}>
-                {albumsList.map((album, index) => (
-                  <div key={`al-${index}`} style={{ display: 'flex', flexDirection: 'column', position: 'relative', background: 'rgba(255,255,255,0.03)', padding: '8px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    
-                    {/* ENHANCED 3-Dot Menu Button */}
-                    <div style={{ position: 'absolute', top: '4px', right: '4px', zIndex: 10 }}>
-                      <button className="menu-btn" style={{ background: 'rgba(0,0,0,0.75)', color: '#fff', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0', border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }} onClick={(e) => toggleMenu(e, `al-${album.name}`)}>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
-                      </button>
-                    </div>
-
-                    {/* Centered Dropdown Menu relative to the CARD, not the button, to avoid clipping! */}
-                    {activeMenu === `al-${album.name}` && (
-                      <div className="dropdown-menu" style={{ left: '50%', transform: 'translateX(-50%)', top: '36px', minWidth: '150px', zIndex: 100 }}>
-                        <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); triggerAlbumCoverUpload(album.name); }}>
-                          🖼 {customAlbumArts[album.name] ? 'Change Art' : 'Add Art'}
-                        </div>
-                        {customAlbumArts[album.name] && (
-                          <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleDeleteAlbumCover(e, album.name); }}>
-                            🗑 Remove Art
+                            <div className="menu-container">
+                              <button className="menu-btn" onClick={(e) => toggleMenu(e, uniqueId)}>⋮</button>
+                              {activeMenu === uniqueId && (
+                                <div className={`dropdown-menu ${menuDirection === 'up' ? 'dropdown-upward' : ''}`}>
+                                  <div className="dropdown-item" onClick={(e) => handleGoToDetails(e, song)}>📄 Go to Details</div>
+                                  <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); alert("Added to queue!"); }}>⏮ Add to Queue</div>
+                                  <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); handleToggleFavorite(song); }}>❤️ {song.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div>
+                                  <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); handleOpenPlaylistModal(song); }}>💽 Add to Playlist</div>
+                                  <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={() => { setSelectedIds([song.id]); handleDeleteSelected(); }}>🗑 Delete Song</div>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
-                    )}
-
-                    <div onClick={() => handleOpenAlbum(album)} style={{ cursor: 'pointer' }}>
-                      <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: '6px', overflow: 'hidden', marginBottom: '8px', backgroundColor: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {isUploading && editingAlbumName === album.name ? (
-                          <span className="spinner-pulse" style={{ fontSize: '1.2rem' }}>⏳</span>
-                        ) : album.cover_url ? (
-                          <img src={album.cover_url} alt={album.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                          // Custom Vinyl Record Fallback
-                          <svg width="50%" height="50%" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle><circle cx="12" cy="12" r="1"></circle></svg>
-                        )}
-                      </div>
-                      <div style={{ fontWeight: '600', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {album.name}
-                      </div>
-                      <div style={{ fontSize: '0.65rem', color: '#888', marginTop: '2px' }}>
-                        {album.songs.length} {album.songs.length === 1 ? 'song' : 'songs'}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                    )
+                  })}
+                </div>
               </div>
             )}
-          </div>
-        )}
-          <div className="empty-state"><h3>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h3><p>This architecture is coming soon!</p></div>
-        )}
-      </div>
 
-      {/* 1. ORIGINAL ADD TO PLAYLIST MODAL */}
-      {showPlaylistModal && (
-        <div className="modal-overlay" onClick={() => setShowPlaylistModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Add to Playlist</h3>
-              <button className="close-modal" onClick={() => setShowPlaylistModal(false)}>×</button>
-            </div>
-            
-            <div className="create-playlist-row">
-              <input 
-                type="text" 
-                placeholder="New playlist name..." 
-                value={newPlaylistName}
-                onChange={(e) => setNewPlaylistName(e.target.value)}
-              />
-              <button className="create-btn" onClick={handleCreatePlaylist}>Create</button>
-            </div>
-
-            <div className="playlist-options">
-              {playlists.length === 0 ? (
-                <p className="no-playlists-text">No playlists yet. Create one above!</p>
-              ) : (
-                playlists.map(pl => (
-                  <div key={pl.id} className="playlist-option-row" onClick={() => handleAddSongToPlaylist(pl.id, songForPlaylist.id)}>
-                    <div className="pl-art-mini">
-                      {pl.cover_url ? <img src={pl.cover_url} alt="cover" /> : '💽'}
+            {/* PLAYLIST DETAIL VIEW */}
+            {activeTab === 'playlist-detail' && currentPlaylist && (
+              <div className="app-container">
+                <div className="sticky-playlist-wrapper" style={{ paddingBottom: '15px' }}>
+                  <button className="back-btn" onClick={() => { setCurrentPlaylist(null); navigateTo('playlists'); }} style={{ padding: '5px 20px', color: '#56CCF2' }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                    <span style={{ fontSize: '1.1rem', fontWeight: '600', marginLeft: '5px' }}>Back</span>
+                  </button>
+                  
+                  <div className="pd-header-content">
+                    <div className={`pd-art ${currentPlaylist.isAuto ? 'liked-music-art' : ''}`}>
+                      {currentPlaylist.isAuto ? '❤️' : currentPlaylist.cover_url ? (
+                        <img src={currentPlaylist.cover_url} alt="cover" className="playlist-list-img" />
+                      ) : '💽'}
                     </div>
-                    <span className="pl-name">{pl.name}</span>
-                    <span className="pl-add-icon">+</span>
+                    <div className="pd-info">
+                      <h2>{currentPlaylist.name}</h2>
+                      <p>{playlistSongs.length} {playlistSongs.length === 1 ? 'Song' : 'Songs'}</p>
+                      
+                      {!currentPlaylist.isAuto && (
+                        <button className="add-songs-btn" onClick={() => setShowAddSongsModal(true)}>
+                          + Add Songs
+                        </button>
+                      )}
+                    </div>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+                </div>
 
-      {/* 2. NEW: ADD SONGS TO PLAYLIST MODAL (FROM DETAIL VIEW) */}
-      {showAddSongsModal && (
-        <div className="modal-overlay" onClick={() => { setShowAddSongsModal(false); setModalSearchTerm(''); }}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Add Songs to {currentPlaylist?.name}</h3>
-              <button className="close-modal" onClick={() => { setShowAddSongsModal(false); setModalSearchTerm(''); }}>×</button>
-            </div>
-            
-            <div className="modal-search-container">
-              <input
-                type="text"
-                placeholder="Search songs or artists..."
-                className="modal-search-input"
-                value={modalSearchTerm}
-                onChange={(e) => setModalSearchTerm(e.target.value)}
-                autoFocus
-              />
-            </div>
+                <div className="song-list">
+                  {playlistSongs.length === 0 ? (
+                    <div className="empty-state"><h3>It's quiet here...</h3><p>Add some songs to this playlist!</p></div>
+                  ) : (
+                    playlistSongs.map((song, index) => {
+                      const isThisPlaying = currentSong && currentSong.audio_url === song.audio_url;
+                      const uniqueId = `pd-${song.id || index}`;
 
-            <div className="playlist-options" style={{ maxHeight: '55vh', overflowY: 'auto' }}>
-              {filteredModalSongs.length === 0 ? (
-                <p className="no-playlists-text">No songs found.</p>
-              ) : (
-                filteredModalSongs.map(song => {
-                  const isAlreadyAdded = playlistSongs.some(s => s.id === song.id);
-                  return (
-                    <div key={song.id} className="playlist-option-row" onClick={() => handleAddSongFromDetail(song)} style={{ opacity: isAlreadyAdded ? 0.5 : 1 }}>
-                      <div className="pl-art-mini">
-                        {song.cover_url ? <img src={song.cover_url} alt="cover" /> : '🎵'}
-                      </div>
-                      <span className="pl-name">{song.title || 'Unknown Song'}</span>
-                      <span className="pl-add-icon">{isAlreadyAdded ? '✓' : '+'}</span>
+                      return (
+                        <div key={uniqueId} className={`list-item ${isThisPlaying ? 'active' : ''}`}>
+                          <div className="list-clickable-area" onClick={() => handlePlayPause(song, 'playlist')}>
+                            <div className="drag-handle" style={{ fontSize: '1rem', color: '#444' }}>{index + 1}</div>
+                            {song.cover_url ? (<img src={song.cover_url} alt="cover" className="list-art" />) : (<div className="list-art placeholder">🎵</div>)}
+                            <div className="list-info">
+                              <div className="list-title">{song.title || 'Unknown Audio'}</div>
+                              <div className="list-subtitle">
+                                {song.artist && <span>{song.artist}</span>}
+                                {isThisPlaying && <span className="list-time-counter">{currentTimeFormatted} / {song.duration || '0:00'}</span>}
+                              </div>
+                              {isThisPlaying && <div className="list-progress-bar"><div className="list-progress-fill" style={{ width: `${progress}%` }}></div></div>}
+                            </div>
+                          </div>
+
+                          <div className="list-actions">
+                            {isThisPlaying && <button className="list-stop-btn" onClick={handleStop}><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>}
+                            <div className="list-status">
+                              {isThisPlaying && isPlaying ? <svg className="playing-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#56CCF2" strokeWidth="2" strokeLinecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg> : <span className="duration-text">{song.duration || '--:--'}</span>}
+                            </div>
+
+                            <div className="menu-container">
+                              <button className="menu-btn" onClick={(e) => toggleMenu(e, uniqueId)}>⋮</button>
+                              {activeMenu === uniqueId && (
+                                <div className={`dropdown-menu ${menuDirection === 'up' ? 'dropdown-upward' : ''}`}>
+                                  <div className="dropdown-item" onClick={(e) => handleGoToDetails(e, song)}>📄 Go to Details</div>
+                                  <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); handleToggleFavorite(song); }}>❤️ {song.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div>
+                                  {(!currentPlaylist.isAuto && !currentPlaylist.isAlbum) && (
+                                    <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={(e) => handleRemoveFromPlaylist(e, song.id)}>🗑 Remove from Playlist</div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* PLAYLISTS VIEW */}
+            {activeTab === 'playlists' && (
+              <div className="app-container">
+                <div className="sticky-playlist-wrapper">
+                  <header className="ocean-header">
+                    <div className="ocean-glow"></div>
+                    <h2 className="ocean-title">My Playlists</h2>
+                  </header>
+
+                  <div className="create-standalone-playlist">
+                    <input 
+                      type="text" 
+                      placeholder="Name your new playlist..." 
+                      value={newPlaylistName}
+                      onChange={(e) => setNewPlaylistName(e.target.value)}
+                      className="standalone-playlist-input"
+                    />
+                    <button className="create-btn" onClick={handleCreatePlaylist}>Create</button>
+                  </div>
+
+                  <div className="selection-toolbar" style={{ padding: '0 15px', marginTop: '-10px', marginBottom: '10px', justifyContent: 'flex-end' }}>
+                    <select className="sort-select" value={playlistSortOrder} onChange={(e) => setPlaylistSortOrder(e.target.value)}>
+                      <option value="newest">Newest First</option>
+                      <option value="oldest">Oldest First</option>
+                      <option value="az">A-Z (Name)</option>
+                      <option value="za">Z-A (Name)</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <input type="file" accept="image/*" ref={playlistFileInputRef} onChange={handlePlaylistCoverUpload} style={{ display: 'none' }} />
+
+                <div className="playlists-list-view">
+                  <div className="playlist-list-item" onClick={handleOpenLikedMusic}>
+                    <div className="playlist-list-art liked-music-art">❤️</div>
+                    <div className="playlist-list-info">
+                      <div className="playlist-list-name">Liked Music</div>
+                      <div style={{ fontSize: '0.8rem', color: '#888', marginTop: '3px' }}>Auto Playlist</div>
                     </div>
-                  );
-                })
-              )}
-            </div>
+                  </div>
+
+                  {sortedPlaylists.length === 0 && (
+                    <div className="empty-state" style={{ paddingTop: '30px' }}>
+                      <p style={{ color: '#888' }}>You haven't created any custom playlists yet.</p>
+                    </div>
+                  )}
+                  
+                  {sortedPlaylists.map((playlist, index) => (
+                    <div key={playlist.id} className="playlist-list-item" onClick={() => handleOpenPlaylist(playlist)}>
+                      <div className="playlist-list-art">
+                        {isUploading && editingPlaylistId === playlist.id ? (
+                          <div className="playlist-art-placeholder spinner-pulse">⏳</div>
+                        ) : playlist.cover_url ? (
+                          <img src={playlist.cover_url} alt={playlist.name} className="playlist-list-img" />
+                        ) : (
+                          <div className="playlist-art-placeholder">💽</div>
+                        )}
+                      </div>
+                      
+                      <div className="playlist-list-info">
+                        <div className="playlist-list-name">{playlist.name}</div>
+                      </div>
+                        
+                      <div className="menu-container">
+                        <button className="menu-btn" onClick={(e) => toggleMenu(e, `pl-${playlist.id}`)}>⋮</button>
+                        {activeMenu === `pl-${playlist.id}` && (
+                          <div className={`dropdown-menu ${index >= sortedPlaylists.length - 3 ? 'dropdown-upward' : ''}`} style={{ right: '0' }}>
+                            <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); triggerPlaylistCoverUpload(playlist.id); }}>
+                              🖼 {playlist.cover_url ? 'Change Art' : 'Add Art'}
+                            </div>
+                            {playlist.cover_url && (
+                              <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleDeletePlaylistCover(e, playlist); }}>
+                                🗑 Remove Art
+                              </div>
+                            )}
+                            <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleDeletePlaylist(playlist); }}>
+                              ❌ Delete Playlist
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ALBUMS VIEW */}
+            {activeTab === 'albums' && (
+              <div className="app-container">
+                <div className="sticky-playlist-wrapper">
+                  <header className="ocean-header">
+                    <div className="ocean-glow"></div>
+                    <h2 className="ocean-title">Albums</h2>
+                  </header>
+                </div>
+                
+                {/* Hidden input for Album Art */}
+                <input type="file" accept="image/*" ref={albumFileInputRef} onChange={handleAlbumCoverUpload} style={{ display: 'none' }} />
+
+                {albumsList.length === 0 ? (
+                  <div className="empty-state"><p>No albums found.</p></div>
+                ) : (
+                  <div className="tag-grid" style={{ padding: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(85px, 1fr))', gap: '12px' }}>
+                    {albumsList.map((album, index) => (
+                      <div key={`al-${index}`} style={{ display: 'flex', flexDirection: 'column', position: 'relative', background: 'rgba(255,255,255,0.03)', padding: '8px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        
+                        {/* 3-Dot Menu overlay for custom Album Art */}
+                        <div style={{ position: 'absolute', top: '4px', right: '4px', zIndex: 10 }}>
+                          <button className="menu-btn" style={{ background: 'rgba(0,0,0,0.75)', color: '#fff', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0', border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }} onClick={(e) => toggleMenu(e, `al-${album.name}`)}>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                          </button>
+                        </div>
+
+                        {/* Centered Dropdown Menu relative to the CARD */}
+                        {activeMenu === `al-${album.name}` && (
+                          <div className="dropdown-menu" style={{ left: '50%', transform: 'translateX(-50%)', top: '36px', minWidth: '150px', zIndex: 100 }}>
+                            <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); triggerAlbumCoverUpload(album.name); }}>
+                              🖼 {customAlbumArts[album.name] ? 'Change Art' : 'Add Art'}
+                            </div>
+                            {customAlbumArts[album.name] && (
+                              <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleDeleteAlbumCover(e, album.name); }}>
+                                🗑 Remove Art
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div onClick={() => handleOpenAlbum(album)} style={{ cursor: 'pointer' }}>
+                          <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: '6px', overflow: 'hidden', marginBottom: '8px', backgroundColor: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {isUploading && editingAlbumName === album.name ? (
+                              <span className="spinner-pulse" style={{ fontSize: '1.2rem' }}>⏳</span>
+                            ) : album.cover_url ? (
+                              <img src={album.cover_url} alt={album.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <svg width="50%" height="50%" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle><circle cx="12" cy="12" r="1"></circle></svg>
+                            )}
+                          </div>
+                          <div style={{ fontWeight: '600', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {album.name}
+                          </div>
+                          <div style={{ fontSize: '0.65rem', color: '#888', marginTop: '2px' }}>
+                            {album.songs.length} {album.songs.length === 1 ? 'song' : 'songs'}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* COMING SOON TABS */}
+            {['queue', 'artists', 'genres'].includes(activeTab) && (
+              <div className="empty-state"><h3>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h3><p>This architecture is coming soon!</p></div>
+            )}
+
           </div>
-        </div>
-      )}
 
-      {/* 3. GLOBAL UPLOAD TOAST */}
-      {isUploading && uploadProgressText && (
-        <div className="global-upload-toast">
-          <span className="spinner-mini">⏳</span>
-          <span className="toast-text">{uploadProgressText}</span>
-        </div>
-      )}
+          {/* ADD TO PLAYLIST MODAL */}
+          {showPlaylistModal && (
+            <div className="modal-overlay" onClick={() => setShowPlaylistModal(false)}>
+              <div className="modal-content" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3>Add to Playlist</h3>
+                  <button className="close-modal" onClick={() => setShowPlaylistModal(false)}>×</button>
+                </div>
+                
+                <div className="create-playlist-row">
+                  <input 
+                    type="text" 
+                    placeholder="New playlist name..." 
+                    value={newPlaylistName}
+                    onChange={(e) => setNewPlaylistName(e.target.value)}
+                  />
+                  <button className="create-btn" onClick={handleCreatePlaylist}>Create</button>
+                </div>
 
-      {/* 4. FOOTER NAVBAR - EXACT MOCKUP MATCH */}
-      <nav className="bottom-footer">
-        
-        {/* 1. List */}
-        <button className={`footer-btn ${activeTab === 'list' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'list')}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg>
-        </button>
-
-        {/* 2. Now Playing (Details) */}
-        <button className={`footer-btn ${activeTab === 'detail' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'detail')}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
-        </button>
-
-        {/* 3. Queue */}
-        <button className={`footer-btn ${activeTab === 'queue' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'queue')}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 5v10a3 3 0 1 0 3 3V8h3V5h-6z"></path><line x1="3" y1="6" x2="13" y2="6"></line><line x1="3" y1="12" x2="13" y2="12"></line><line x1="3" y1="18" x2="13" y2="18"></line></svg>
-        </button>
-
-        {/* 4. Playlist */}
-        <button className={`footer-btn ${(activeTab === 'playlists' || activeTab === 'playlist-detail') ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, currentPlaylist ? 'playlist-detail' : 'playlists')}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 8v10a2 2 0 0 0 2 2h10"></path>
-            <rect x="8" y="4" width="12" height="12" rx="2" ry="2"></rect>
-            <path d="M14.5 12.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"></path>
-            <path d="M14.5 12.5V7l2.5 1"></path>
-          </svg>
-        </button>
-
-        {/* 5. Artist */}
-        <button className={`footer-btn ${activeTab === 'artists' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'artists')}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-        </button>
-
-        {/* 6. Genre */}
-        <button className={`footer-btn ${activeTab === 'genres' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'genres')}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
-        </button>
-
-        {/* 7. Album */}
-        <button className={`footer-btn ${activeTab === 'albums' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'albums')}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
-        </button>
-
-        {/* 8. Search */}
-        <button className={`footer-btn ${showSearch ? 'active-tab' : ''}`} onClick={(e) => { e.stopPropagation(); navigateTo('list'); setShowSearch(!showSearch); }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        </button>
-
-        {/* 9. 3-Dot Menu */}
-        <div className="menu-container" style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-          <button className="footer-btn" onClick={(e) => toggleMenu(e, 'footer-menu')}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
-          </button>
-
-          {/* The popup menu that appears when you click the 3 dots */}
-          {activeMenu === 'footer-menu' && (
-            <div className="dropdown-menu dropdown-upward" style={{ right: '10px', bottom: '60px', minWidth: '160px', padding: '10px 0' }}>
-              
-              <div className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 15px' }} onClick={(e) => { e.stopPropagation(); handleFooterNavigation(e, 'settings'); }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="3"></circle>
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                </svg>
-                <span>Settings</span>
+                <div className="playlist-options">
+                  {playlists.length === 0 ? (
+                    <p className="no-playlists-text">No playlists yet. Create one above!</p>
+                  ) : (
+                    playlists.map(pl => (
+                      <div key={pl.id} className="playlist-option-row" onClick={() => handleAddSongToPlaylist(pl.id, songForPlaylist.id)}>
+                        <div className="pl-art-mini">
+                          {pl.cover_url ? <img src={pl.cover_url} alt="cover" /> : '💽'}
+                        </div>
+                        <span className="pl-name">{pl.name}</span>
+                        <span className="pl-add-icon">+</span>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
-
-              <div className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 15px' }} onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleExitApp(); }}>
-                {/* Red, slightly bold Power Icon */}
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff4d4d" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
-                  <line x1="12" y1="2" x2="12" y2="12"></line>
-                </svg>
-                {/* Text uses default color */}
-                <span>Close App</span>
-              </div>
-
             </div>
           )}
-        </div>
 
-      </nav>
-      </>
+          {/* ADD SONGS TO PLAYLIST MODAL */}
+          {showAddSongsModal && (
+            <div className="modal-overlay" onClick={() => { setShowAddSongsModal(false); setModalSearchTerm(''); }}>
+              <div className="modal-content" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3>Add Songs to {currentPlaylist?.name}</h3>
+                  <button className="close-modal" onClick={() => { setShowAddSongsModal(false); setModalSearchTerm(''); }}>×</button>
+                </div>
+                
+                <div className="modal-search-container">
+                  <input
+                    type="text"
+                    placeholder="Search songs or artists..."
+                    className="modal-search-input"
+                    value={modalSearchTerm}
+                    onChange={(e) => setModalSearchTerm(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+
+                <div className="playlist-options" style={{ maxHeight: '55vh', overflowY: 'auto' }}>
+                  {filteredModalSongs.length === 0 ? (
+                    <p className="no-playlists-text">No songs found.</p>
+                  ) : (
+                    filteredModalSongs.map(song => {
+                      const isAlreadyAdded = playlistSongs.some(s => s.id === song.id);
+                      return (
+                        <div key={song.id} className="playlist-option-row" onClick={() => handleAddSongFromDetail(song)} style={{ opacity: isAlreadyAdded ? 0.5 : 1 }}>
+                          <div className="pl-art-mini">
+                            {song.cover_url ? <img src={song.cover_url} alt="cover" /> : '🎵'}
+                          </div>
+                          <span className="pl-name">{song.title || 'Unknown Song'}</span>
+                          <span className="pl-add-icon">{isAlreadyAdded ? '✓' : '+'}</span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* GLOBAL UPLOAD TOAST */}
+          {isUploading && uploadProgressText && (
+            <div className="global-upload-toast">
+              <span className="spinner-mini">⏳</span>
+              <span className="toast-text">{uploadProgressText}</span>
+            </div>
+          )}
+
+          {/* FOOTER NAVBAR */}
+          <nav className="bottom-footer">
+            
+            {/* 1. List */}
+            <button className={`footer-btn ${activeTab === 'list' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'list')}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg>
+            </button>
+
+            {/* 2. Now Playing (Details) */}
+            <button className={`footer-btn ${activeTab === 'detail' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'detail')}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
+            </button>
+
+            {/* 3. Queue */}
+            <button className={`footer-btn ${activeTab === 'queue' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'queue')}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 5v10a3 3 0 1 0 3 3V8h3V5h-6z"></path><line x1="3" y1="6" x2="13" y2="6"></line><line x1="3" y1="12" x2="13" y2="12"></line><line x1="3" y1="18" x2="13" y2="18"></line></svg>
+            </button>
+
+            {/* 4. Playlist */}
+            <button className={`footer-btn ${(activeTab === 'playlists' || activeTab === 'playlist-detail') ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, currentPlaylist ? 'playlist-detail' : 'playlists')}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 8v10a2 2 0 0 0 2 2h10"></path>
+                <rect x="8" y="4" width="12" height="12" rx="2" ry="2"></rect>
+                <path d="M14.5 12.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"></path>
+                <path d="M14.5 12.5V7l2.5 1"></path>
+              </svg>
+            </button>
+
+            {/* 5. Artist */}
+            <button className={`footer-btn ${activeTab === 'artists' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'artists')}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            </button>
+
+            {/* 6. Genre */}
+            <button className={`footer-btn ${activeTab === 'genres' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'genres')}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+            </button>
+
+            {/* 7. Album */}
+            <button className={`footer-btn ${activeTab === 'albums' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'albums')}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
+            </button>
+
+            {/* 8. Search */}
+            <button className={`footer-btn ${showSearch ? 'active-tab' : ''}`} onClick={(e) => { e.stopPropagation(); navigateTo('list'); setShowSearch(!showSearch); }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </button>
+
+            {/* 9. 3-Dot Menu */}
+            <div className="menu-container" style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+              <button className="footer-btn" onClick={(e) => toggleMenu(e, 'footer-menu')}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+              </button>
+
+              {/* The popup menu that appears when you click the 3 dots */}
+              {activeMenu === 'footer-menu' && (
+                <div className="dropdown-menu dropdown-upward" style={{ right: '10px', bottom: '60px', minWidth: '160px', padding: '10px 0' }}>
+                  
+                  <div className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 15px' }} onClick={(e) => { e.stopPropagation(); handleFooterNavigation(e, 'settings'); }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="3"></circle>
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    <span>Settings</span>
+                  </div>
+
+                  <div className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 15px' }} onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleExitApp(); }}>
+                    {/* Red, slightly bold Power Icon */}
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff4d4d" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                      <line x1="12" y1="2" x2="12" y2="12"></line>
+                    </svg>
+                    <span style={{ color: '#fff' }}>Close App</span>
+                  </div>
+
+                </div>
+              )}
+            </div>
+
+          </nav>
+        </>
       )}
     </div>
   )
