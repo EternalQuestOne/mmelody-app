@@ -613,6 +613,31 @@ const handleNextSong = () => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   }
 
+// --- NEW: ALBUM GROUPING LOGIC ---
+  const albumsMap = songs.reduce((acc, song) => {
+    // If a song has no album tag, group it under "Unknown Album"
+    const albumName = song.album ? song.album.trim() : 'Unknown Album';
+    if (!acc[albumName]) {
+      acc[albumName] = { name: albumName, cover_url: song.cover_url, songs: [] };
+    }
+    // If the album doesn't have a cover yet, but this song does, use it!
+    if (!acc[albumName].cover_url && song.cover_url) {
+      acc[albumName].cover_url = song.cover_url; 
+    }
+    acc[albumName].songs.push(song);
+    return acc;
+  }, {});
+  
+  // Convert the map into an array and sort it alphabetically A-Z
+  const albumsList = Object.values(albumsMap).sort((a, b) => a.name.localeCompare(b.name));
+
+  const handleOpenAlbum = (album) => {
+    // We trick the app into thinking the Album is an "Auto Playlist"
+    setCurrentPlaylist({ id: `album-${album.name}`, name: album.name, isAuto: true, isAlbum: true, cover_url: album.cover_url });
+    setPlaylistSongs(album.songs); 
+    navigateTo('playlist-detail');
+  };
+
   return (
     <div className="app-root" onClick={() => setActiveMenu(null)}> 
 
@@ -997,8 +1022,10 @@ const handleNextSong = () => {
                             <div className={`dropdown-menu ${menuDirection === 'up' ? 'dropdown-upward' : ''}`}>
                               <div className="dropdown-item" onClick={(e) => handleGoToDetails(e, song)}>📄 Go to Details</div>
                               <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); handleToggleFavorite(song); }}>❤️ {song.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div>
-                              {/* NEW: Remove from this specific playlist! */}
-                              <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={(e) => handleRemoveFromPlaylist(e, song.id)}>🗑 Remove from Playlist</div>
+                              {/* Hide the remove button if we are viewing an Album! */}
+                              {!currentPlaylist.isAlbum && (
+                                <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={(e) => handleRemoveFromPlaylist(e, song.id)}>🗑 Remove from Playlist</div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -1108,9 +1135,45 @@ const handleNextSong = () => {
           </div>
         )}
 
-        {['queue', 'albums', 'artists'].includes(activeTab) && (
-          <div className="empty-state"><h3>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h3><p>This architecture is coming soon!</p></div>
+        {/* --- NEW: ALBUMS TAB --- */}
+        {activeTab === 'albums' && (
+          <div className="app-container">
+            <div className="sticky-playlist-wrapper">
+              <header className="ocean-header">
+                <div className="ocean-glow"></div>
+                <h2 className="ocean-title">Albums</h2>
+              </header>
+            </div>
+            
+            {albumsList.length === 0 ? (
+              <div className="empty-state"><p>No albums found.</p></div>
+            ) : (
+              <div className="tag-grid" style={{ padding: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '15px' }}>
+                {albumsList.map((album, index) => (
+                  <div key={index} onClick={() => handleOpenAlbum(album)} style={{ display: 'flex', flexDirection: 'column', cursor: 'pointer', background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: '8px', overflow: 'hidden', marginBottom: '10px', backgroundColor: '#222', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {album.cover_url ? (
+                        <img src={album.cover_url} alt={album.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <span style={{ fontSize: '2.5rem' }}>💿</span>
+                      )}
+                    </div>
+                    <div style={{ fontWeight: '600', fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {album.name}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '4px' }}>
+                      {album.songs.length} {album.songs.length === 1 ? 'song' : 'songs'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
+
+        {['queue', 'artists', 'genres'].includes(activeTab) && (
+          <div className="empty-state"><h3>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h3><p>This architecture is coming soon!</p></div>
+        )}
       </div>
 
       {/* 1. ORIGINAL ADD TO PLAYLIST MODAL */}
