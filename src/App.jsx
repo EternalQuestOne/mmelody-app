@@ -1373,7 +1373,7 @@ function App() {
             </button>
 
             {/* 4. Playlist */}
-            <button className={`footer-btn ${(activeTab === 'playlists' || activeTab === 'playlist-detail') ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, currentPlaylist ? 'playlist-detail' : 'playlists')}>
+            <button className={`footer-btn ${(activeTab === 'playlists' || (activeTab === 'playlist-detail' && currentPlaylist && !currentPlaylist.isAlbum)) ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, (currentPlaylist && !currentPlaylist.isAlbum) ? 'playlist-detail' : 'playlists')}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 8v10a2 2 0 0 0 2 2h10"></path>
                 <rect x="8" y="4" width="12" height="12" rx="2" ry="2"></rect>
@@ -1393,7 +1393,7 @@ function App() {
             </button>
 
             {/* 7. Album */}
-            <button className={`footer-btn ${activeTab === 'albums' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'albums')}>
+            <button className={`footer-btn ${(activeTab === 'albums' || (activeTab === 'playlist-detail' && currentPlaylist && currentPlaylist.isAlbum)) ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, (currentPlaylist && currentPlaylist.isAlbum) ? 'playlist-detail' : 'albums')}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
             </button>
 
