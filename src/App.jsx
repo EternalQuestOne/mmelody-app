@@ -3,8 +3,7 @@ import { supabase } from './supabaseClient'
 import jsmediatags from 'jsmediatags/dist/jsmediatags.min.js'
 import './App.css'
 
-// NEW: Importing your generated energetic logo asset!
-import logoImage from './logo.png' // Save image_0.png as logo.png in your src folder
+import logoImage from './logo.png' 
 
 const extractTagText = (frame) => {
   if (!frame) return '';
@@ -57,7 +56,9 @@ function App() {
   const [uploadProgressText, setUploadProgressText] = useState('')
   const [showMoreDetails, setShowMoreDetails] = useState(false) 
   const [activeMenu, setActiveMenu] = useState(null)
-  const [menuDirection, setMenuDirection] = useState('down')
+  
+  // Smart 6-way menu state
+  const [menuDirection, setMenuDirection] = useState({ vertical: 'top', horizontal: 'center' });
   
   // Playlist State Variables
   const [playlists, setPlaylists] = useState([]);
@@ -68,13 +69,10 @@ function App() {
   const playlistFileInputRef = useRef(null);
   const [editingPlaylistId, setEditingPlaylistId] = useState(null);
 
-  // Album State & Dictionary
+  // Album State & Cloud Dictionary
   const albumFileInputRef = useRef(null);
   const [editingAlbumName, setEditingAlbumName] = useState(null);
-  const [customAlbumArts, setCustomAlbumArts] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('customAlbumArts')) || {}; } 
-    catch { return {}; }
-  });
+  const [customAlbumArts, setCustomAlbumArts] = useState({});
 
   // Detail View State
   const [currentPlaylist, setCurrentPlaylist] = useState(null);
@@ -140,19 +138,30 @@ function App() {
     if (supabase) {
       getSongs();
       getPlaylists();
+      getAlbumArts();
     }
   }, [])
 
   async function getSongs() {
     if (!supabase) return;
-    const { data, error } = await supabase.from('songs').select('*').order('created_at', { ascending: false })
+    const { data } = await supabase.from('songs').select('*').order('created_at', { ascending: false })
     if (data) setSongs(data)
   }
 
   async function getPlaylists() {
     if (!supabase) return;
-    const { data, error } = await supabase.from('playlists').select('*').order('created_at', { ascending: false })
+    const { data } = await supabase.from('playlists').select('*').order('created_at', { ascending: false })
     if (data) setPlaylists(data)
+  }
+
+  async function getAlbumArts() {
+    if (!supabase) return;
+    const { data } = await supabase.from('album_arts').select('*');
+    if (data) {
+      const artsDict = {};
+      data.forEach(item => { artsDict[item.name] = item.cover_url; });
+      setCustomAlbumArts(artsDict);
+    }
   }
 
   const handleOpenPlaylistModal = (song) => {
@@ -332,9 +341,8 @@ function App() {
       const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${credentials.cloudinaryName}/image/upload`, { method: 'POST', body: imgFormData });
       const newCoverUrl = (await imgRes.json()).secure_url;
 
-      const newDict = { ...customAlbumArts, [editingAlbumName]: newCoverUrl };
-      setCustomAlbumArts(newDict);
-      localStorage.setItem('customAlbumArts', JSON.stringify(newDict));
+      await supabase.from('album_arts').upsert([{ name: editingAlbumName, cover_url: newCoverUrl }]);
+      setCustomAlbumArts(prev => ({ ...prev, [editingAlbumName]: newCoverUrl }));
 
     } catch (err) { console.error("Album cover upload error:", err); } 
     finally {
@@ -359,10 +367,12 @@ function App() {
         if (coverId) await fetch('/api/deleteImage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ public_id: coverId })});
       }
       
-      const newDict = { ...customAlbumArts };
-      delete newDict[albumName];
-      setCustomAlbumArts(newDict);
-      localStorage.setItem('customAlbumArts', JSON.stringify(newDict));
+      await supabase.from('album_arts').delete().eq('name', albumName);
+      setCustomAlbumArts(prev => {
+        const newDict = { ...prev };
+        delete newDict[albumName];
+        return newDict;
+      });
 
     } catch (err) { console.error("Cover delete error:", err); } 
     finally { setIsUploading(false); setUploadProgressText(''); }
@@ -534,16 +544,46 @@ function App() {
     }, 100);
   }
 
+  // 6-ZONE SMART MENU LOGIC
   const toggleMenu = (e, id) => {
     e.stopPropagation(); 
     if (activeMenu === id) {
       setActiveMenu(null);
     } else {
-      const isBottomHalf = e.clientY > (window.innerHeight / 2);
-      setMenuDirection(isBottomHalf ? 'up' : 'down');
+      const x = e.clientX;
+      const y = e.clientY;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+
+      const vertical = y > (h / 2) ? 'bottom' : 'top';
+      
+      let horizontal = 'center';
+      if (x < w / 3) horizontal = 'left';
+      else if (x > (w * 2) / 3) horizontal = 'right';
+
+      setMenuDirection({ vertical, horizontal });
       setActiveMenu(id);
     }
   }
+
+  const getDropdownStyle = () => {
+    let style = { position: 'absolute', zIndex: 100, minWidth: '150px' };
+    
+    if (menuDirection.vertical === 'bottom') {
+      style.bottom = '100%'; style.marginBottom = '8px';
+    } else {
+      style.top = '100%'; style.marginTop = '8px'; 
+    }
+
+    if (menuDirection.horizontal === 'left') {
+      style.left = '0'; 
+    } else if (menuDirection.horizontal === 'right') {
+      style.right = '0'; 
+    } else {
+      style.left = '50%'; style.transform = 'translateX(-50%)'; 
+    }
+    return style;
+  };
 
   const handleGoToDetails = (e, song) => {
     e.stopPropagation();
@@ -641,7 +681,7 @@ function App() {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   }
 
-  // ALBUM GROUPING LOGIC
+  // ALBUM GROUPING LOGIC (NO ID3 FALLBACK)
   const albumsMap = songs.reduce((acc, song) => {
     const albumName = song.album ? song.album.trim() : 'Unknown Album';
     if (!acc[albumName]) {
@@ -965,7 +1005,7 @@ function App() {
                             <div className="menu-container">
                               <button className="menu-btn" onClick={(e) => toggleMenu(e, uniqueId)}>⋮</button>
                               {activeMenu === uniqueId && (
-                                <div className={`dropdown-menu ${menuDirection === 'up' ? 'dropdown-upward' : ''}`}>
+                                <div className="dropdown-menu" style={getDropdownStyle()}>
                                   <div className="dropdown-item" onClick={(e) => handleGoToDetails(e, song)}>📄 Go to Details</div>
                                   <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); alert("Added to queue!"); }}>⏮ Add to Queue</div>
                                   <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); handleToggleFavorite(song); }}>❤️ {song.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div>
@@ -1043,7 +1083,7 @@ function App() {
                             <div className="menu-container">
                               <button className="menu-btn" onClick={(e) => toggleMenu(e, uniqueId)}>⋮</button>
                               {activeMenu === uniqueId && (
-                                <div className={`dropdown-menu ${menuDirection === 'up' ? 'dropdown-upward' : ''}`}>
+                                <div className="dropdown-menu" style={getDropdownStyle()}>
                                   <div className="dropdown-item" onClick={(e) => handleGoToDetails(e, song)}>📄 Go to Details</div>
                                   <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); handleToggleFavorite(song); }}>❤️ {song.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div>
                                   {(!currentPlaylist.isAuto && !currentPlaylist.isAlbum) && (
@@ -1127,7 +1167,7 @@ function App() {
                       <div className="menu-container">
                         <button className="menu-btn" onClick={(e) => toggleMenu(e, `pl-${playlist.id}`)}>⋮</button>
                         {activeMenu === `pl-${playlist.id}` && (
-                          <div className={`dropdown-menu ${index >= sortedPlaylists.length - 3 ? 'dropdown-upward' : ''}`} style={{ right: '0' }}>
+                          <div className="dropdown-menu" style={getDropdownStyle()}>
                             <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); triggerPlaylistCoverUpload(playlist.id); }}>
                               🖼 {playlist.cover_url ? 'Change Art' : 'Add Art'}
                             </div>
@@ -1177,7 +1217,7 @@ function App() {
 
                         {/* Centered Dropdown Menu relative to the CARD */}
                         {activeMenu === `al-${album.name}` && (
-                          <div className="dropdown-menu" style={{ left: '50%', transform: 'translateX(-50%)', top: '36px', minWidth: '150px', zIndex: 100 }}>
+                          <div className="dropdown-menu" style={getDropdownStyle()}>
                             <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); triggerAlbumCoverUpload(album.name); }}>
                               🖼 {customAlbumArts[album.name] ? 'Change Art' : 'Add Art'}
                             </div>
@@ -1364,7 +1404,7 @@ function App() {
 
               {/* The popup menu that appears when you click the 3 dots */}
               {activeMenu === 'footer-menu' && (
-                <div className="dropdown-menu dropdown-upward" style={{ right: '10px', bottom: '60px', minWidth: '160px', padding: '10px 0' }}>
+                <div className="dropdown-menu" style={{ ...getDropdownStyle(), right: '10px', bottom: '60px', left: 'auto', top: 'auto', minWidth: '160px', padding: '10px 0', transform: 'none' }}>
                   
                   <div className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 15px' }} onClick={(e) => { e.stopPropagation(); handleFooterNavigation(e, 'settings'); }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1375,7 +1415,6 @@ function App() {
                   </div>
 
                   <div className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 15px' }} onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleExitApp(); }}>
-                    {/* Red, slightly bold Power Icon */}
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff4d4d" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
                       <line x1="12" y1="2" x2="12" y2="12"></line>
