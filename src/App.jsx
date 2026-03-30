@@ -84,6 +84,7 @@ function App() {
   const [showAddSongsModal, setShowAddSongsModal] = useState(false); 
   const [modalSearchTerm, setModalSearchTerm] = useState('');
   const [queueContext, setQueueContext] = useState('main'); 
+  const [playingFrom, setPlayingFrom] = useState('Library: All Songs'); // NEW: Tracks the playing location
 
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -520,6 +521,17 @@ function App() {
     if (!audioRef.current) return;
     setQueueContext(context);
 
+    // NEW: Capture exactly where this song is being played from!
+    if (context === 'main') {
+      setPlayingFrom('Library: All Songs');
+    } else if (context === 'playlist' && currentPlaylist) {
+      let type = 'Playlist';
+      if (currentPlaylist.isAlbum) type = 'Album';
+      else if (currentPlaylist.isArtist) type = 'Artist';
+      else if (currentPlaylist.isGenre) type = 'Genre';
+      setPlayingFrom(`${type}: ${currentPlaylist.name}`);
+    }
+
     if (currentSong && currentSong.audio_url === song.audio_url) {
       if (isPlaying) { 
         audioRef.current.pause(); 
@@ -916,6 +928,12 @@ function App() {
                       <span className="scroll-title">{currentSong.title || 'Unknown Title'}</span>
                       {currentSong.artist && <span className="scroll-artist"> • {currentSong.artist}</span>}
                     </div>
+                  </div>
+
+                  {/* NEW: Now Playing Context Label */}
+                  <div style={{ textAlign: 'center', color: '#888', fontSize: '0.85rem', marginTop: '-5px', marginBottom: '15px', fontWeight: '500', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#56CCF2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                    Playing from {playingFrom}
                   </div>
 
                   <div className="detail-interaction-row">
