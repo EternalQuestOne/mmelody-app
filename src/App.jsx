@@ -802,15 +802,28 @@ function App() {
   const artistsList = Object.values(artistsMap).sort((a, b) => a.name.localeCompare(b.name));
   const filteredArtists = artistsList.filter(ar => (ar.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
 
-  // GENRES GROUPING LOGIC
+  // GENRES GROUPING LOGIC (SMART SPLIT)
   const genresMap = songs.reduce((acc, song) => {
-    const genreName = song.genre ? song.genre.trim() : 'Unknown Genre';
-    if (!acc[genreName]) {
-      acc[genreName] = { name: genreName, songs: [] };
-    }
-    acc[genreName].songs.push(song);
+    let rawGenre = song.genre ? song.genre.trim() : 'Unknown Genre';
+    
+    // Split the string by commas or slashes, trim spaces, and remove empties
+    let genreArray = rawGenre.split(/[,/]/).map(g => g.trim()).filter(Boolean);
+    
+    if (genreArray.length === 0) genreArray = ['Unknown Genre'];
+
+    genreArray.forEach(genreName => {
+      if (!acc[genreName]) {
+        acc[genreName] = { name: genreName, songs: [] };
+      }
+      // Ensure we don't accidentally add the exact same song twice to one genre
+      if (!acc[genreName].songs.find(s => s.id === song.id)) {
+        acc[genreName].songs.push(song);
+      }
+    });
+    
     return acc;
   }, {});
+  
   const genresList = Object.values(genresMap).sort((a, b) => a.name.localeCompare(b.name));
   const filteredGenres = genresList.filter(gn => (gn.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -1528,11 +1541,11 @@ function App() {
                 ) : (
                   <div className="tag-grid" style={{ padding: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '12px' }}>
                     {filteredGenres.map((genre, index) => (
-                      <div key={`gn-${index}`} onClick={() => handleOpenGenre(genre)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'linear-gradient(135deg, rgba(86, 204, 242, 0.2), rgba(47, 128, 237, 0.2))', padding: '15px 10px', borderRadius: '12px', border: '1px solid rgba(86, 204, 242, 0.3)', boxShadow: '0 4px 10px rgba(0,0,0,0.2)' }}>
-                        <div style={{ fontWeight: '700', fontSize: '1rem', color: '#fff', textAlign: 'center', marginBottom: '5px' }}>
+                      <div key={`gn-${index}`} onClick={() => handleOpenGenre(genre)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'linear-gradient(135deg, rgba(86, 204, 242, 0.15), rgba(47, 128, 237, 0.15))', padding: '10px', borderRadius: '12px', border: '1px solid rgba(86, 204, 242, 0.3)', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', aspectRatio: '1/1', textAlign: 'center' }}>
+                        <div style={{ fontWeight: '700', fontSize: '0.95rem', color: '#fff', marginBottom: '6px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                           {genre.name}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: '#56CCF2' }}>
+                        <div style={{ fontSize: '0.7rem', color: '#56CCF2' }}>
                           {genre.songs.length} {genre.songs.length === 1 ? 'song' : 'songs'}
                         </div>
                       </div>
