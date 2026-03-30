@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabaseClient'
 import jsmediatags from 'jsmediatags/dist/jsmediatags.min.js'
 import './App.css'
-
-import logoImage from './logo.png' 
+import logoImage from './logo.png'
+import { MediaSession } from '@capgo/capacitor-media-session';
 
 const extractTagText = (frame) => {
   if (!frame) return '';
@@ -104,25 +104,40 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if ('mediaSession' in navigator && currentSong) {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: currentSong.title || 'Unknown Title',
-        artist: currentSong.artist || 'Unknown Artist',
-        artwork: currentSong.cover_url ? [
-          { src: currentSong.cover_url, sizes: '512x512', type: 'image/png' }
-        ] : []
-      });
+    const updateNativeLockScreen = async () => {
+      if (!currentSong) return;
 
-      navigator.mediaSession.setActionHandler('play', () => {
-        if (audioRef.current) { audioRef.current.play(); setIsPlaying(true); }
-      });
-      navigator.mediaSession.setActionHandler('pause', () => {
-        if (audioRef.current) { audioRef.current.pause(); setIsPlaying(false); }
-      });
-      navigator.mediaSession.setActionHandler('previoustrack', () => handlePreviousSong());
-      navigator.mediaSession.setActionHandler('nexttrack', () => handleNextSong());
-    }
-  }, [currentSong, queueContext, playlistSongs, songs, isShuffle, userQueue]);
+      try {
+        // 1. Send the song info and thumbnail to the Native Lock Screen
+        await MediaSession.setMetadata({
+          title: currentSong.title || 'Unknown Title',
+          artist: currentSong.artist || 'Unknown Artist',
+          album: currentSong.album || 'mMelody',
+          artwork: currentSong.cover_url || '' 
+        });
+
+        // 2. Tell Android to start/stop the Background Music Service
+        await MediaSession.setPlaybackState({ 
+          playbackState: isPlaying ? 'playing' : 'paused' 
+        });
+
+        // 3. Connect the physical lock screen buttons to your React app
+        await MediaSession.setActionHandler({ action: 'play' }, () => {
+          if (audioRef.current) { audioRef.current.play().catch(e=>console.log(e)); setIsPlaying(true); }
+        });
+        await MediaSession.setActionHandler({ action: 'pause' }, () => {
+          if (audioRef.current) { audioRef.current.pause(); setIsPlaying(false); }
+        });
+        await MediaSession.setActionHandler({ action: 'previoustrack' }, () => handlePreviousSong());
+        await MediaSession.setActionHandler({ action: 'nexttrack' }, () => handleNextSong());
+        
+      } catch (err) {
+        console.log("Media Session error:", err);
+      }
+    };
+
+    updateNativeLockScreen();
+  }, [currentSong, isPlaying, queueContext, playlistSongs, songs, isShuffle, userQueue]);
 
   const navigateTo = (newTab) => {
     if (activeTab === newTab) return;

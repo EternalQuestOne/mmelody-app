@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">mMelody</string>
+    <string name="title_activity_main">mMelody</string>
+    <string name="package_name">com.mmelody.app</string>
+    <string name="custom_url_scheme">com.mmelody.app</string>
+</resources>
