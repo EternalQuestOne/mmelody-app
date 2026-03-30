@@ -567,8 +567,15 @@ function App() {
   }
 
   const getDropdownStyle = () => {
-    let style = { position: 'absolute', zIndex: 100, minWidth: '150px' };
+    let style = { position: 'absolute', zIndex: 9999, minWidth: '160px' };
     
+    // CRITICAL FIX: Reset the CSS defaults so the menu doesn't squash itself!
+    style.top = 'auto';
+    style.bottom = 'auto';
+    style.left = 'auto';
+    style.right = 'auto';
+    style.transform = 'none';
+
     if (menuDirection.vertical === 'bottom') {
       style.bottom = '100%'; style.marginBottom = '8px';
     } else {
