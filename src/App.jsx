@@ -113,7 +113,7 @@ function App() {
           title: currentSong.title || 'Unknown Title',
           artist: currentSong.artist || 'Unknown Artist',
           album: currentSong.album || 'mMelody',
-          artwork: currentSong.cover_url || '' 
+          artwork: currentSong.cover_url ? currentSong.cover_url.replace('/upload/', '/upload/w_500,h_500,c_fill/') : '' 
         });
 
         // 2. Tell Android to start/stop the Background Music Service
