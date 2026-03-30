@@ -59,7 +59,6 @@ function App() {
   
   const [menuDirection, setMenuDirection] = useState({ vertical: 'top', horizontal: 'center' });
   
-  // Playlists State
   const [playlists, setPlaylists] = useState([]);
   const [playlistSortOrder, setPlaylistSortOrder] = useState('newest');
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
@@ -68,23 +67,22 @@ function App() {
   const playlistFileInputRef = useRef(null);
   const [editingPlaylistId, setEditingPlaylistId] = useState(null);
 
-  // Albums State
   const albumFileInputRef = useRef(null);
   const [editingAlbumName, setEditingAlbumName] = useState(null);
   const [customAlbumArts, setCustomAlbumArts] = useState({});
 
-  // Artists State
   const artistFileInputRef = useRef(null);
   const [editingArtistName, setEditingArtistName] = useState(null);
   const [customArtistArts, setCustomArtistArts] = useState({});
 
-  // Detail View State
   const [currentPlaylist, setCurrentPlaylist] = useState(null);
   const [playlistSongs, setPlaylistSongs] = useState([]);
   const [showAddSongsModal, setShowAddSongsModal] = useState(false); 
   const [modalSearchTerm, setModalSearchTerm] = useState('');
+  
+  // QUEUE & PLAYBACK CONTEXT
   const [queueContext, setQueueContext] = useState('main'); 
-  const [playingFrom, setPlayingFrom] = useState('Library: All Songs'); // NEW: Tracks the playing location
+  const [playingFrom, setPlayingFrom] = useState('Library: All Songs');
 
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -521,7 +519,7 @@ function App() {
     if (!audioRef.current) return;
     setQueueContext(context);
 
-    // NEW: Capture exactly where this song is being played from!
+    // TRACK PLAYING LOCATION
     if (context === 'main') {
       setPlayingFrom('Library: All Songs');
     } else if (context === 'playlist' && currentPlaylist) {
@@ -761,11 +759,6 @@ function App() {
     if (fileInputRef.current) fileInputRef.current.value = null; 
   }
 
-  const toggleSelection = (id) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  }
-
-  // --- FILTERING AND SEARCH LOGIC ---
   const filteredSongs = sortedSongs.filter(song =>
     (song.title && song.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (song.artist && song.artist.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -775,6 +768,10 @@ function App() {
     (song.title && song.title.toLowerCase().includes(modalSearchTerm.toLowerCase())) ||
     (song.artist && song.artist.toLowerCase().includes(modalSearchTerm.toLowerCase()))
   );
+
+  const toggleSelection = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  }
 
   const filteredPlaylists = sortedPlaylists.filter(pl => 
     (pl.name || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -802,32 +799,24 @@ function App() {
   const artistsList = Object.values(artistsMap).sort((a, b) => a.name.localeCompare(b.name));
   const filteredArtists = artistsList.filter(ar => (ar.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
 
-  // GENRES GROUPING LOGIC (SMART SPLIT)
   const genresMap = songs.reduce((acc, song) => {
     let rawGenre = song.genre ? song.genre.trim() : 'Unknown Genre';
-    
-    // Split the string by commas or slashes, trim spaces, and remove empties
     let genreArray = rawGenre.split(/[,/]/).map(g => g.trim()).filter(Boolean);
-    
     if (genreArray.length === 0) genreArray = ['Unknown Genre'];
 
     genreArray.forEach(genreName => {
       if (!acc[genreName]) {
         acc[genreName] = { name: genreName, songs: [] };
       }
-      // Ensure we don't accidentally add the exact same song twice to one genre
       if (!acc[genreName].songs.find(s => s.id === song.id)) {
         acc[genreName].songs.push(song);
       }
     });
-    
     return acc;
   }, {});
-  
   const genresList = Object.values(genresMap).sort((a, b) => a.name.localeCompare(b.name));
   const filteredGenres = genresList.filter(gn => (gn.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
 
-  // --- NAVIGATION HANDLERS ---
   const handleOpenAlbum = (album) => {
     setCurrentPlaylist({ id: `album-${album.name}`, name: album.name, isAuto: true, isAlbum: true, cover_url: album.cover_url });
     setPlaylistSongs(album.songs); 
@@ -849,7 +838,6 @@ function App() {
   return (
     <div className="app-root" onClick={() => setActiveMenu(null)}> 
 
-      {/* --- THE WELCOME / SETTINGS GATEWAY --- */}
       {(!isConfigured || activeTab === 'settings') && (
         <div className="app-container" style={{ padding: '30px 20px', textAlign: 'center', marginTop: '40px' }}>
           <div className="pd-header-content" style={{ flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
@@ -905,7 +893,6 @@ function App() {
         </div>
       )}
 
-      {/* --- THE REST OF THE APP IS HIDDEN UNTIL CONFIGURED --- */}
       {isConfigured && (
         <> 
           <audio 
@@ -943,7 +930,7 @@ function App() {
                     </div>
                   </div>
 
-                  {/* NEW: Now Playing Context Label */}
+                  {/* NEW: NOW PLAYING CONTEXT LABEL */}
                   <div style={{ textAlign: 'center', color: '#888', fontSize: '0.85rem', marginTop: '-5px', marginBottom: '15px', fontWeight: '500', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#56CCF2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
                     Playing from {playingFrom}
@@ -1099,14 +1086,20 @@ function App() {
                   </div>
 
                   {showSearch && (
-                    <input
-                      type="text"
-                      placeholder="Search songs or artists..."
-                      className="search-bar animate-search"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      autoFocus
-                    />
+                    <div className="search-input-wrapper animate-search" style={{ position: 'relative', width: '100%', marginBottom: '10px' }}>
+                      <input
+                        type="text"
+                        placeholder="Search songs or artists..."
+                        className="search-bar"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        autoFocus
+                        style={{ marginBottom: 0, paddingRight: '40px', width: '100%', boxSizing: 'border-box' }}
+                      />
+                      {searchTerm && (
+                        <button onClick={() => setSearchTerm('')} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+                      )}
+                    </div>
                   )}
                 </header>
                 
@@ -1181,7 +1174,6 @@ function App() {
               <div className="app-container">
                 <div className="sticky-playlist-wrapper" style={{ paddingBottom: '15px' }}>
                   
-                  {/* DYNAMIC BACK BUTTON */}
                   <button className="back-btn" onClick={() => { 
                       const targetTab = currentPlaylist.isAlbum ? 'albums' : currentPlaylist.isArtist ? 'artists' : currentPlaylist.isGenre ? 'genres' : 'playlists';
                       setCurrentPlaylist(null); 
@@ -1292,7 +1284,7 @@ function App() {
                   </div>
                   
                   {showSearch && (
-                    <div style={{ padding: '0 15px 10px 15px' }}>
+                    <div style={{ padding: '0 15px 10px 15px', position: 'relative' }}>
                       <input
                         type="text"
                         placeholder="Search playlists..."
@@ -1300,8 +1292,11 @@ function App() {
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         autoFocus
-                        style={{ marginBottom: 0 }}
+                        style={{ marginBottom: 0, paddingRight: '40px', width: '100%', boxSizing: 'border-box' }}
                       />
+                      {searchTerm && (
+                        <button onClick={() => setSearchTerm('')} style={{ position: 'absolute', right: '25px', top: 'calc(50% - 5px)', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1372,7 +1367,7 @@ function App() {
                     <h2 className="ocean-title">Albums</h2>
                   </header>
                   {showSearch && (
-                    <div style={{ padding: '0 15px 10px 15px' }}>
+                    <div style={{ padding: '0 15px 10px 15px', position: 'relative' }}>
                       <input
                         type="text"
                         placeholder="Search albums..."
@@ -1380,8 +1375,11 @@ function App() {
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         autoFocus
-                        style={{ marginBottom: 0 }}
+                        style={{ marginBottom: 0, paddingRight: '40px', width: '100%', boxSizing: 'border-box' }}
                       />
+                      {searchTerm && (
+                        <button onClick={() => setSearchTerm('')} style={{ position: 'absolute', right: '25px', top: 'calc(50% - 5px)', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1447,7 +1445,7 @@ function App() {
                     <h2 className="ocean-title">Artists</h2>
                   </header>
                   {showSearch && (
-                    <div style={{ padding: '0 15px 10px 15px' }}>
+                    <div style={{ padding: '0 15px 10px 15px', position: 'relative' }}>
                       <input
                         type="text"
                         placeholder="Search artists..."
@@ -1455,8 +1453,11 @@ function App() {
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         autoFocus
-                        style={{ marginBottom: 0 }}
+                        style={{ marginBottom: 0, paddingRight: '40px', width: '100%', boxSizing: 'border-box' }}
                       />
+                      {searchTerm && (
+                        <button onClick={() => setSearchTerm('')} style={{ position: 'absolute', right: '25px', top: 'calc(50% - 5px)', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1513,7 +1514,7 @@ function App() {
               </div>
             )}
 
-            {/* GENRES VIEW - FULLY BUILT */}
+            {/* GENRES VIEW */}
             {activeTab === 'genres' && (
               <div className="app-container">
                 <div className="sticky-playlist-wrapper">
@@ -1522,7 +1523,7 @@ function App() {
                     <h2 className="ocean-title">Genres</h2>
                   </header>
                   {showSearch && (
-                    <div style={{ padding: '0 15px 10px 15px' }}>
+                    <div style={{ padding: '0 15px 10px 15px', position: 'relative' }}>
                       <input
                         type="text"
                         placeholder="Search genres..."
@@ -1530,8 +1531,11 @@ function App() {
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         autoFocus
-                        style={{ marginBottom: 0 }}
+                        style={{ marginBottom: 0, paddingRight: '40px', width: '100%', boxSizing: 'border-box' }}
                       />
+                      {searchTerm && (
+                        <button onClick={() => setSearchTerm('')} style={{ position: 'absolute', right: '25px', top: 'calc(50% - 5px)', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1609,7 +1613,7 @@ function App() {
                   <button className="close-modal" onClick={() => { setShowAddSongsModal(false); setModalSearchTerm(''); }}>×</button>
                 </div>
                 
-                <div className="modal-search-container">
+                <div className="modal-search-container" style={{ position: 'relative' }}>
                   <input
                     type="text"
                     placeholder="Search songs or artists..."
@@ -1617,7 +1621,11 @@ function App() {
                     value={modalSearchTerm}
                     onChange={(e) => setModalSearchTerm(e.target.value)}
                     autoFocus
+                    style={{ paddingRight: '40px', width: '100%', boxSizing: 'border-box' }}
                   />
+                  {modalSearchTerm && (
+                    <button onClick={() => setModalSearchTerm('')} style={{ position: 'absolute', right: '25px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', fontSize: '1.2rem', cursor: 'pointer', marginTop: '2px' }}>✕</button>
+                  )}
                 </div>
 
                 <div className="playlist-options" style={{ maxHeight: '55vh', overflowY: 'auto' }}>
@@ -1686,7 +1694,6 @@ function App() {
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
             </button>
 
-            {/* SMART SEARCH BUTTON */}
             <button className={`footer-btn ${showSearch ? 'active-tab' : ''}`} onClick={(e) => { 
               e.stopPropagation(); 
               if (['detail', 'queue', 'settings', 'playlist-detail'].includes(activeTab)) {

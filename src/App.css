@@ -324,8 +324,8 @@ body {
   letter-spacing: 0.5px; /* Gives the bold letters a tiny bit of breathing room */
 }
 .lyrics-box { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; }
-.lyrics-box h4 { margin: 0 0 15px 0; color: #56CCF2; } 
-.lyrics-box p { white-space: pre-wrap; color: #ddd; line-height: 1.6; font-size: 1.25rem; margin: 0; }
+.lyrics-box h4 { margin: 0 0 10px 0; color: #56CCF2; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; } 
+.lyrics-box p { white-space: pre-wrap; color: #ddd; line-height: 1.6; font-size: 0.8rem; margin: 0; }
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
