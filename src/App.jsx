@@ -180,6 +180,22 @@ function App() {
     }
   }
 
+  // --- NEW: CLOUD SYNC LOGIC ---
+  const handleRefreshData = async () => {
+    setIsUploading(true);
+    setUploadProgressText("Syncing cloud data...");
+    try {
+      await getSongs();
+      await getPlaylists();
+      await getAlbumArts();
+      await getArtistArts();
+    } finally {
+      setIsUploading(false);
+      setUploadProgressText('');
+      showToast("Library Synced!");
+    }
+  };
+
   // --- NEW: QUEUE HELPER FUNCTIONS ---
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -1848,6 +1864,16 @@ function App() {
               {activeMenu === 'footer-menu' && (
                 <div className="dropdown-menu" style={{ ...getDropdownStyle(), right: '10px', bottom: '60px', left: 'auto', top: 'auto', minWidth: '160px', padding: '10px 0', transform: 'none' }}>
                   
+                  {/* NEW: Dedicated Cloud Sync Button! */}
+                  <div className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 15px' }} onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleRefreshData(); }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#56CCF2" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="23 4 23 10 17 10"></polyline>
+                      <polyline points="1 20 1 14 7 14"></polyline>
+                      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                    <span style={{ color: '#fff' }}>Sync Cloud</span>
+                  </div>
+
                   <div className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 15px' }} onClick={(e) => { e.stopPropagation(); handleFooterNavigation(e, 'settings'); }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="12" cy="12" r="3"></circle>
