@@ -103,25 +103,46 @@ function App() {
     return () => window.removeEventListener('popstate', handleHardwareBack);
   }, []);
 
+  // 1. Handle Play/Pause Icon Syncing (Runs ONLY when play state changes)
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+    }
+    MediaSession.setPlaybackState({ 
+      playbackState: isPlaying ? 'playing' : 'paused' 
+    }).catch(e => console.log("Playback state error:", e));
+  }, [isPlaying]);
+
+  // 2. Handle Lock Screen Data & Buttons (Runs ONLY when the song changes)
   useEffect(() => {
     const updateNativeLockScreen = async () => {
       if (!currentSong) return;
 
+      // Force Cloudinary to serve a strict 500x500 JPEG format (f_jpg)
+      const optimizedArt = currentSong.cover_url 
+        ? currentSong.cover_url.replace('/upload/', '/upload/w_500,h_500,c_fill,f_jpg/') 
+        : '';
+
+      // A. Standard Web API Fallback (Android Chrome uses this natively)
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: currentSong.title || 'Unknown Title',
+          artist: currentSong.artist || 'Unknown Artist',
+          album: currentSong.album || 'mMelody',
+          artwork: optimizedArt ? [{ src: optimizedArt, sizes: '512x512', type: 'image/jpeg' }] : []
+        });
+      }
+
       try {
-        // 1. Send the song info and thumbnail to the Native Lock Screen
+        // B. Capacitor Native Plugin
         await MediaSession.setMetadata({
           title: currentSong.title || 'Unknown Title',
           artist: currentSong.artist || 'Unknown Artist',
           album: currentSong.album || 'mMelody',
-          artwork: currentSong.cover_url ? currentSong.cover_url.replace('/upload/', '/upload/w_500,h_500,c_fill/') : '' 
+          artwork: optimizedArt 
         });
 
-        // 2. Tell Android to start/stop the Background Music Service
-        await MediaSession.setPlaybackState({ 
-          playbackState: isPlaying ? 'playing' : 'paused' 
-        });
-
-        // 3. Connect the physical lock screen buttons to your React app
+        // Set up button handlers ONCE per song
         await MediaSession.setActionHandler({ action: 'play' }, () => {
           if (audioRef.current) { audioRef.current.play().catch(e=>console.log(e)); setIsPlaying(true); }
         });
@@ -137,7 +158,7 @@ function App() {
     };
 
     updateNativeLockScreen();
-  }, [currentSong, isPlaying, queueContext, playlistSongs, songs, isShuffle, userQueue]);
+  }, [currentSong, queueContext, playlistSongs, songs, isShuffle, userQueue]);
 
   const navigateTo = (newTab) => {
     if (activeTab === newTab) return;
