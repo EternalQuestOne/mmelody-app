@@ -80,9 +80,11 @@ function App() {
   const [showAddSongsModal, setShowAddSongsModal] = useState(false); 
   const [modalSearchTerm, setModalSearchTerm] = useState('');
   
-  // QUEUE & PLAYBACK CONTEXT
+  // NEW: QUEUE & PLAYBACK STATE
   const [queueContext, setQueueContext] = useState('main'); 
   const [playingFrom, setPlayingFrom] = useState('Library: All Songs');
+  const [userQueue, setUserQueue] = useState([]);
+  const [toastMessage, setToastMessage] = useState('');
 
   const audioRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -120,7 +122,7 @@ function App() {
       navigator.mediaSession.setActionHandler('previoustrack', () => handlePreviousSong());
       navigator.mediaSession.setActionHandler('nexttrack', () => handleNextSong());
     }
-  }, [currentSong, queueContext, playlistSongs, songs, isShuffle]);
+  }, [currentSong, queueContext, playlistSongs, songs, isShuffle, userQueue]);
 
   const navigateTo = (newTab) => {
     if (activeTab === newTab) return;
@@ -177,6 +179,28 @@ function App() {
       setCustomArtistArts(artsDict);
     }
   }
+
+  // --- NEW: QUEUE HELPER FUNCTIONS ---
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(''), 3000);
+  };
+
+  const handleAddToQueue = (e, song) => {
+    e.stopPropagation();
+    setActiveMenu(null);
+    setUserQueue(prev => [...prev, song]);
+    showToast(`Added to Queue`);
+  };
+
+  // Dynamically calculate the next upcoming songs for the Queue tab
+  const getUpcomingSongs = () => {
+    const currentList = queueContext === 'playlist' ? playlistSongs : sortedSongs;
+    if (!currentList.length || !currentSong || isShuffle) return [];
+    const currentIndex = currentList.findIndex(s => s.audio_url === currentSong.audio_url);
+    if (currentIndex === -1 || currentIndex === currentList.length - 1) return [];
+    return currentList.slice(currentIndex + 1, currentIndex + 21); // Returns max 20 upcoming songs
+  };
 
   const handleOpenPlaylistModal = (song) => {
     setSongForPlaylist(song);
@@ -519,7 +543,7 @@ function App() {
     if (!audioRef.current) return;
     setQueueContext(context);
 
-    // TRACK PLAYING LOCATION
+    // Track Location!
     if (context === 'main') {
       setPlayingFrom('Library: All Songs');
     } else if (context === 'playlist' && currentPlaylist) {
@@ -573,7 +597,20 @@ function App() {
     }
   }
 
+  // --- NEW: QUEUE ENABLED handleNextSong ---
   const handleNextSong = () => {
+    // 1. Always check user queue FIRST!
+    if (userQueue.length > 0) {
+      const nextSong = userQueue[0];
+      setUserQueue(prev => prev.slice(1));
+      setProgress(0);
+      setCurrentTimeFormatted('0:00');
+      setCurrentSong(nextSong);
+      setIsPlaying(true);
+      return;
+    }
+
+    // 2. Normal playback sequence fallback
     const currentList = queueContext === 'playlist' ? playlistSongs : sortedSongs;
     if (!currentList.length || !currentSong) return;
     
@@ -759,6 +796,10 @@ function App() {
     if (fileInputRef.current) fileInputRef.current.value = null; 
   }
 
+  const toggleSelection = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  }
+
   const filteredSongs = sortedSongs.filter(song =>
     (song.title && song.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (song.artist && song.artist.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -768,10 +809,6 @@ function App() {
     (song.title && song.title.toLowerCase().includes(modalSearchTerm.toLowerCase())) ||
     (song.artist && song.artist.toLowerCase().includes(modalSearchTerm.toLowerCase()))
   );
-
-  const toggleSelection = (id) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  }
 
   const filteredPlaylists = sortedPlaylists.filter(pl => 
     (pl.name || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -930,7 +967,6 @@ function App() {
                     </div>
                   </div>
 
-                  {/* NEW: NOW PLAYING CONTEXT LABEL */}
                   <div style={{ textAlign: 'center', color: '#888', fontSize: '0.85rem', marginTop: '-5px', marginBottom: '15px', fontWeight: '500', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#56CCF2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
                     Playing from {playingFrom}
@@ -957,7 +993,7 @@ function App() {
                       </svg>
                     </button>
 
-                    <button className="detail-inter-btn" onClick={() => alert("Add to Queue logic coming soon!")} title="Play Next in Queue">
+                    <button className="detail-inter-btn" onClick={() => { navigateTo('queue'); setShowMoreDetails(false); }} title="View Queue">
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="4" y1="6" x2="20" y2="6"></line>
                         <line x1="4" y1="12" x2="20" y2="12"></line>
@@ -1038,7 +1074,7 @@ function App() {
                         {currentSong.lyrics ? (
                           <div className="lyrics-box"><h4>Lyrics</h4><p>{currentSong.lyrics}</p></div>
                         ) : (
-                          <div className="lyrics-box"><p style={{color: '#888', fontStyle: 'italic'}}>No lyrics embedded in this file.</p></div>
+                          <div className="lyrics-box"><p style={{color: '#888', fontStyle: 'italic'}}>Lyrics not available.</p></div>
                         )}
                       </div>
                     )}
@@ -1153,7 +1189,7 @@ function App() {
                               {activeMenu === uniqueId && (
                                 <div className="dropdown-menu" style={getDropdownStyle()}>
                                   <div className="dropdown-item" onClick={(e) => handleGoToDetails(e, song)}>📄 Go to Details</div>
-                                  <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); alert("Added to queue!"); }}>⏮ Add to Queue</div>
+                                  <div className="dropdown-item" onClick={(e) => handleAddToQueue(e, song)}>⏮ Add to Queue</div>
                                   <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); handleToggleFavorite(song); }}>❤️ {song.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div>
                                   <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); handleOpenPlaylistModal(song); }}>💽 Add to Playlist</div>
                                   <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={() => { setSelectedIds([song.id]); handleDeleteSelected(); }}>🗑 Delete Song</div>
@@ -1238,6 +1274,7 @@ function App() {
                               {activeMenu === uniqueId && (
                                 <div className="dropdown-menu" style={getDropdownStyle()}>
                                   <div className="dropdown-item" onClick={(e) => handleGoToDetails(e, song)}>📄 Go to Details</div>
+                                  <div className="dropdown-item" onClick={(e) => handleAddToQueue(e, song)}>⏮ Add to Queue</div>
                                   <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); handleToggleFavorite(song); }}>❤️ {song.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div>
                                   {(!currentPlaylist.isAuto && !currentPlaylist.isAlbum && !currentPlaylist.isArtist && !currentPlaylist.isGenre) && (
                                     <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={(e) => handleRemoveFromPlaylist(e, song.id)}>🗑 Remove from Playlist</div>
@@ -1559,9 +1596,107 @@ function App() {
               </div>
             )}
 
-            {/* COMING SOON TABS */}
-            {['queue'].includes(activeTab) && (
-              <div className="empty-state"><h3>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h3><p>This architecture is coming soon!</p></div>
+            {/* QUEUE VIEW (NEW!) */}
+            {activeTab === 'queue' && (
+              <div className="app-container">
+                <div className="sticky-playlist-wrapper">
+                  <header className="ocean-header">
+                    <div className="ocean-glow"></div>
+                    <h2 className="ocean-title">Queue</h2>
+                  </header>
+                </div>
+
+                <div className="song-list" style={{ paddingBottom: '20px' }}>
+                  
+                  {/* NOW PLAYING */}
+                  {currentSong && (
+                    <div style={{ padding: '0 15px 10px' }}>
+                        <span style={{ color: '#56CCF2', fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>Now Playing</span>
+                    </div>
+                  )}
+                  {currentSong && (
+                    <div className="list-item active" style={{ marginBottom: '25px', borderRadius: '8px', margin: '0 15px 25px 15px', border: '1px solid rgba(86, 204, 242, 0.3)' }} onClick={() => navigateTo('detail')}>
+                        {currentSong.cover_url ? (<img src={currentSong.cover_url} alt="cover" className="list-art" />) : (<div className="list-art placeholder">🎵</div>)}
+                        <div className="list-info">
+                          <div className="list-title">{currentSong.title || 'Unknown Audio'}</div>
+                          <div className="list-subtitle">
+                            {currentSong.artist && <span>{currentSong.artist}</span>}
+                          </div>
+                        </div>
+                        <div className="list-status">
+                          {isPlaying ? <svg className="playing-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#56CCF2" strokeWidth="2" strokeLinecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg> : null}
+                        </div>
+                    </div>
+                  )}
+
+                  {/* UP NEXT HEADER */}
+                  <div style={{ padding: '0 15px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#888', fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                      {userQueue.length > 0 ? `Next In Queue (${userQueue.length})` : `Next From: ${playingFrom}`}
+                    </span>
+                    {userQueue.length > 0 && (
+                      <button onClick={() => setUserQueue([])} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer' }}>Clear Queue</button>
+                    )}
+                  </div>
+
+                  {/* QUEUE LIST */}
+                  {userQueue.length > 0 ? (
+                    userQueue.map((song, index) => {
+                      const uniqueId = `uq-${song.id || index}-${index}`;
+                      return (
+                        <div key={uniqueId} className="list-item">
+                            <div className="list-clickable-area" onClick={() => {
+                                const newQueue = userQueue.slice(index + 1);
+                                setUserQueue(newQueue);
+                                setProgress(0);
+                                setCurrentTimeFormatted('0:00');
+                                setCurrentSong(song);
+                                setIsPlaying(true);
+                            }}>
+                              <div className="drag-handle" style={{ fontSize: '1rem', color: '#444' }}>{index + 1}</div>
+                              {song.cover_url ? (<img src={song.cover_url} alt="cover" className="list-art" />) : (<div className="list-art placeholder">🎵</div>)}
+                              <div className="list-info">
+                                <div className="list-title">{song.title || 'Unknown Audio'}</div>
+                                <div className="list-subtitle">{song.artist && <span>{song.artist}</span>}</div>
+                              </div>
+                            </div>
+                            <div className="list-actions">
+                              <button className="list-stop-btn" onClick={(e) => {
+                                e.stopPropagation();
+                                setUserQueue(prev => prev.filter((_, i) => i !== index));
+                              }}>
+                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                              </button>
+                            </div>
+                        </div>
+                      )
+                    })
+                  ) : (
+                    // RENDER UPCOMING FROM CONTEXT
+                    getUpcomingSongs().length === 0 ? (
+                      <div className="empty-state">
+                        {isShuffle ? <p>Shuffle is on! Next track is a surprise 🎲</p> : <p>No more songs coming up.</p>}
+                      </div>
+                    ) : (
+                      getUpcomingSongs().map((song, index) => {
+                        const uniqueId = `nq-${song.id || index}-${index}`;
+                        return (
+                            <div key={uniqueId} className="list-item" onClick={() => handlePlayPause(song, queueContext)}>
+                              <div className="list-clickable-area">
+                                  <div className="drag-handle" style={{ fontSize: '1rem', color: '#444' }}>{index + 1}</div>
+                                  {song.cover_url ? (<img src={song.cover_url} alt="cover" className="list-art" />) : (<div className="list-art placeholder">🎵</div>)}
+                                  <div className="list-info">
+                                    <div className="list-title">{song.title || 'Unknown Audio'}</div>
+                                    <div className="list-subtitle">{song.artist && <span>{song.artist}</span>}</div>
+                                  </div>
+                              </div>
+                            </div>
+                        )
+                      })
+                    )
+                  )}
+                </div>
+              </div>
             )}
 
           </div>
@@ -1650,11 +1785,12 @@ function App() {
             </div>
           )}
 
-          {/* GLOBAL UPLOAD TOAST */}
-          {isUploading && uploadProgressText && (
-            <div className="global-upload-toast">
-              <span className="spinner-mini">⏳</span>
-              <span className="toast-text">{uploadProgressText}</span>
+          {/* GLOBAL TOAST (UPLOADS & QUEUE) */}
+          {(isUploading || toastMessage) && (
+            <div className="global-upload-toast" style={{ bottom: '90px' }}>
+              {isUploading && <span className="spinner-mini">⏳</span>}
+              {!isUploading && <span>✅</span>}
+              <span className="toast-text">{isUploading ? uploadProgressText : toastMessage}</span>
             </div>
           )}
 
