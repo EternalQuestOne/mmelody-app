@@ -74,16 +74,21 @@ body {
 
 /* Note: I completely deleted the @keyframes logo-pulse block that was here! */
 
-.brand-header-wrapper h2 { 
-  margin: 0; 
-  font-size: 2.6rem; /* Bumped up slightly because script fonts tend to run a bit smaller */
-  font-weight: normal; /* Kaushan Script renders best at normal weight */
-  font-family: 'Kaushan Script', cursive; 
-  background: linear-gradient(90deg, #7edbfac2, #2F80ED); 
-  -webkit-background-clip: text; 
+.brand-header-wrapper h2 {
+  margin: 0;
+  font-size: 2.6rem;
+  font-weight: normal;
+  font-family: 'Kaushan Script', cursive;
+  /* --- ENHANCEMENT 1: More Vibrant Colours --- */
+  background: linear-gradient(90deg, #00FFFF, #1D55E0); /* Highly Saturated Cyan to Rich Blue */
+  -webkit-background-clip: text;
   background-clip: text;
-  -webkit-text-fill-color: transparent; 
-  letter-spacing: 1px; /* Tweaked spacing so the script letters connect nicely */
+  -webkit-text-fill-color: transparent;
+  letter-spacing: 1px;
+  /* --- ENHANCEMENT 2: Slight Embossed Effect --- */
+  text-shadow:
+    0.5px 0.5px 1px rgba(255, 255, 255, 0.2), /* Subtle white highlights create raised edges */
+    -0.5px -0.5px 1px rgba(0, 0, 0, 0.3);     /* Subtle dark shadow creates lift from the background */
 }
 
 @keyframes logo-pulse {
