@@ -258,7 +258,6 @@ function App() {
     }
   };
 
-  // PLAYLIST ART HANDLERS
   const triggerPlaylistCoverUpload = (playlistId) => {
     setEditingPlaylistId(playlistId);
     playlistFileInputRef.current.click();
@@ -331,7 +330,6 @@ function App() {
     finally { setIsUploading(false); setUploadProgressText(''); }
   };
 
-  // ALBUM ART HANDLERS
   const triggerAlbumCoverUpload = (albumName) => {
     setEditingAlbumName(albumName);
     albumFileInputRef.current.click();
@@ -394,7 +392,6 @@ function App() {
     finally { setIsUploading(false); setUploadProgressText(''); }
   };
 
-  // ARTIST ART HANDLERS
   const triggerArtistCoverUpload = (artistName) => {
     setEditingArtistName(artistName);
     artistFileInputRef.current.click();
@@ -623,7 +620,6 @@ function App() {
     }, 100);
   }
 
-  // 6-ZONE SMART MENU LOGIC
   const toggleMenu = (e, id) => {
     e.stopPropagation(); 
     if (activeMenu === id) {
@@ -753,20 +749,25 @@ function App() {
     if (fileInputRef.current) fileInputRef.current.value = null; 
   }
 
+  const toggleSelection = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  }
+
+  // --- FILTERING AND SEARCH LOGIC ---
   const filteredSongs = sortedSongs.filter(song =>
     (song.title && song.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (song.artist && song.artist.toLowerCase().includes(searchTerm.toLowerCase()))
   )
+  
   const filteredModalSongs = songs.filter(song =>
     (song.title && song.title.toLowerCase().includes(modalSearchTerm.toLowerCase())) ||
     (song.artist && song.artist.toLowerCase().includes(modalSearchTerm.toLowerCase()))
   );
 
-  const toggleSelection = (id) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  }
+  const filteredPlaylists = sortedPlaylists.filter(pl => 
+    (pl.name || '').toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  // ALBUM GROUPING LOGIC (NO ID3 FALLBACK)
   const albumsMap = songs.reduce((acc, song) => {
     const albumName = song.album ? song.album.trim() : 'Unknown Album';
     if (!acc[albumName]) {
@@ -775,16 +776,9 @@ function App() {
     acc[albumName].songs.push(song);
     return acc;
   }, {});
-  
   const albumsList = Object.values(albumsMap).sort((a, b) => a.name.localeCompare(b.name));
+  const filteredAlbums = albumsList.filter(al => (al.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
 
-  const handleOpenAlbum = (album) => {
-    setCurrentPlaylist({ id: `album-${album.name}`, name: album.name, isAuto: true, isAlbum: true, cover_url: album.cover_url });
-    setPlaylistSongs(album.songs); 
-    navigateTo('playlist-detail');
-  };
-
-  // ARTIST GROUPING LOGIC
   const artistsMap = songs.reduce((acc, song) => {
     const artistName = song.artist ? song.artist.trim() : 'Unknown Artist';
     if (!acc[artistName]) {
@@ -793,12 +787,37 @@ function App() {
     acc[artistName].songs.push(song);
     return acc;
   }, {});
-  
   const artistsList = Object.values(artistsMap).sort((a, b) => a.name.localeCompare(b.name));
+  const filteredArtists = artistsList.filter(ar => (ar.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
+
+  // GENRES GROUPING LOGIC
+  const genresMap = songs.reduce((acc, song) => {
+    const genreName = song.genre ? song.genre.trim() : 'Unknown Genre';
+    if (!acc[genreName]) {
+      acc[genreName] = { name: genreName, songs: [] };
+    }
+    acc[genreName].songs.push(song);
+    return acc;
+  }, {});
+  const genresList = Object.values(genresMap).sort((a, b) => a.name.localeCompare(b.name));
+  const filteredGenres = genresList.filter(gn => (gn.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
+
+  // --- NAVIGATION HANDLERS ---
+  const handleOpenAlbum = (album) => {
+    setCurrentPlaylist({ id: `album-${album.name}`, name: album.name, isAuto: true, isAlbum: true, cover_url: album.cover_url });
+    setPlaylistSongs(album.songs); 
+    navigateTo('playlist-detail');
+  };
 
   const handleOpenArtist = (artist) => {
     setCurrentPlaylist({ id: `artist-${artist.name}`, name: artist.name, isAuto: true, isArtist: true, cover_url: artist.cover_url });
     setPlaylistSongs(artist.songs); 
+    navigateTo('playlist-detail');
+  };
+
+  const handleOpenGenre = (genre) => {
+    setCurrentPlaylist({ id: `genre-${genre.name}`, name: genre.name, isAuto: true, isGenre: true });
+    setPlaylistSongs(genre.songs); 
     navigateTo('playlist-detail');
   };
 
@@ -1133,7 +1152,7 @@ function App() {
                   
                   {/* DYNAMIC BACK BUTTON */}
                   <button className="back-btn" onClick={() => { 
-                      const targetTab = currentPlaylist.isAlbum ? 'albums' : currentPlaylist.isArtist ? 'artists' : 'playlists';
+                      const targetTab = currentPlaylist.isAlbum ? 'albums' : currentPlaylist.isArtist ? 'artists' : currentPlaylist.isGenre ? 'genres' : 'playlists';
                       setCurrentPlaylist(null); 
                       navigateTo(targetTab); 
                     }} style={{ padding: '5px 20px', color: '#56CCF2' }}>
@@ -1143,7 +1162,7 @@ function App() {
                   
                   <div className="pd-header-content">
                     <div className={`pd-art ${currentPlaylist.isAuto ? 'liked-music-art' : ''}`} style={currentPlaylist.isArtist ? { borderRadius: '50%' } : {}}>
-                      {currentPlaylist.isAuto && !currentPlaylist.isAlbum && !currentPlaylist.isArtist ? '❤️' : currentPlaylist.cover_url ? (
+                      {currentPlaylist.isAuto && !currentPlaylist.isAlbum && !currentPlaylist.isArtist && !currentPlaylist.isGenre ? '❤️' : currentPlaylist.cover_url ? (
                         <img src={currentPlaylist.cover_url} alt="cover" className="playlist-list-img" />
                       ) : currentPlaylist.isArtist ? (
                         <svg width="40%" height="40%" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
@@ -1197,7 +1216,7 @@ function App() {
                                 <div className="dropdown-menu" style={getDropdownStyle()}>
                                   <div className="dropdown-item" onClick={(e) => handleGoToDetails(e, song)}>📄 Go to Details</div>
                                   <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); handleToggleFavorite(song); }}>❤️ {song.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div>
-                                  {(!currentPlaylist.isAuto && !currentPlaylist.isAlbum && !currentPlaylist.isArtist) && (
+                                  {(!currentPlaylist.isAuto && !currentPlaylist.isAlbum && !currentPlaylist.isArtist && !currentPlaylist.isGenre) && (
                                     <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={(e) => handleRemoveFromPlaylist(e, song.id)}>🗑 Remove from Playlist</div>
                                   )}
                                 </div>
@@ -1240,6 +1259,20 @@ function App() {
                       <option value="za">Z-A (Name)</option>
                     </select>
                   </div>
+                  
+                  {showSearch && (
+                    <div style={{ padding: '0 15px 10px 15px' }}>
+                      <input
+                        type="text"
+                        placeholder="Search playlists..."
+                        className="search-bar animate-search"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        autoFocus
+                        style={{ marginBottom: 0 }}
+                      />
+                    </div>
+                  )}
                 </div>
                 
                 <input type="file" accept="image/*" ref={playlistFileInputRef} onChange={handlePlaylistCoverUpload} style={{ display: 'none' }} />
@@ -1253,13 +1286,13 @@ function App() {
                     </div>
                   </div>
 
-                  {sortedPlaylists.length === 0 && (
+                  {filteredPlaylists.length === 0 && (
                     <div className="empty-state" style={{ paddingTop: '30px' }}>
-                      <p style={{ color: '#888' }}>You haven't created any custom playlists yet.</p>
+                      <p style={{ color: '#888' }}>No custom playlists found.</p>
                     </div>
                   )}
                   
-                  {sortedPlaylists.map((playlist, index) => (
+                  {filteredPlaylists.map((playlist, index) => (
                     <div key={playlist.id} className="playlist-list-item" onClick={() => handleOpenPlaylist(playlist)}>
                       <div className="playlist-list-art">
                         {isUploading && editingPlaylistId === playlist.id ? (
@@ -1307,15 +1340,28 @@ function App() {
                     <div className="ocean-glow"></div>
                     <h2 className="ocean-title">Albums</h2>
                   </header>
+                  {showSearch && (
+                    <div style={{ padding: '0 15px 10px 15px' }}>
+                      <input
+                        type="text"
+                        placeholder="Search albums..."
+                        className="search-bar animate-search"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        autoFocus
+                        style={{ marginBottom: 0 }}
+                      />
+                    </div>
+                  )}
                 </div>
                 
                 <input type="file" accept="image/*" ref={albumFileInputRef} onChange={handleAlbumCoverUpload} style={{ display: 'none' }} />
 
-                {albumsList.length === 0 ? (
+                {filteredAlbums.length === 0 ? (
                   <div className="empty-state"><p>No albums found.</p></div>
                 ) : (
                   <div className="tag-grid" style={{ padding: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(85px, 1fr))', gap: '12px' }}>
-                    {albumsList.map((album, index) => (
+                    {filteredAlbums.map((album, index) => (
                       <div key={`al-${index}`} style={{ display: 'flex', flexDirection: 'column', position: 'relative', background: 'rgba(255,255,255,0.03)', padding: '8px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
                         
                         <div style={{ position: 'absolute', top: '4px', right: '4px', zIndex: 10 }}>
@@ -1369,15 +1415,28 @@ function App() {
                     <div className="ocean-glow"></div>
                     <h2 className="ocean-title">Artists</h2>
                   </header>
+                  {showSearch && (
+                    <div style={{ padding: '0 15px 10px 15px' }}>
+                      <input
+                        type="text"
+                        placeholder="Search artists..."
+                        className="search-bar animate-search"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        autoFocus
+                        style={{ marginBottom: 0 }}
+                      />
+                    </div>
+                  )}
                 </div>
                 
                 <input type="file" accept="image/*" ref={artistFileInputRef} onChange={handleArtistCoverUpload} style={{ display: 'none' }} />
 
-                {artistsList.length === 0 ? (
+                {filteredArtists.length === 0 ? (
                   <div className="empty-state"><p>No artists found.</p></div>
                 ) : (
                   <div className="tag-grid" style={{ padding: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '15px' }}>
-                    {artistsList.map((artist, index) => (
+                    {filteredArtists.map((artist, index) => (
                       <div key={`ar-${index}`} style={{ display: 'flex', flexDirection: 'column', position: 'relative', alignItems: 'center', background: 'transparent', padding: '5px' }}>
                         
                         <div style={{ position: 'absolute', top: '0px', right: '0px', zIndex: 10 }}>
@@ -1423,8 +1482,50 @@ function App() {
               </div>
             )}
 
+            {/* GENRES VIEW - FULLY BUILT */}
+            {activeTab === 'genres' && (
+              <div className="app-container">
+                <div className="sticky-playlist-wrapper">
+                  <header className="ocean-header">
+                    <div className="ocean-glow"></div>
+                    <h2 className="ocean-title">Genres</h2>
+                  </header>
+                  {showSearch && (
+                    <div style={{ padding: '0 15px 10px 15px' }}>
+                      <input
+                        type="text"
+                        placeholder="Search genres..."
+                        className="search-bar animate-search"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        autoFocus
+                        style={{ marginBottom: 0 }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {filteredGenres.length === 0 ? (
+                  <div className="empty-state"><p>No genres found.</p></div>
+                ) : (
+                  <div className="tag-grid" style={{ padding: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '12px' }}>
+                    {filteredGenres.map((genre, index) => (
+                      <div key={`gn-${index}`} onClick={() => handleOpenGenre(genre)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'linear-gradient(135deg, rgba(86, 204, 242, 0.2), rgba(47, 128, 237, 0.2))', padding: '15px 10px', borderRadius: '12px', border: '1px solid rgba(86, 204, 242, 0.3)', boxShadow: '0 4px 10px rgba(0,0,0,0.2)' }}>
+                        <div style={{ fontWeight: '700', fontSize: '1rem', color: '#fff', textAlign: 'center', marginBottom: '5px' }}>
+                          {genre.name}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#56CCF2' }}>
+                          {genre.songs.length} {genre.songs.length === 1 ? 'song' : 'songs'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* COMING SOON TABS */}
-            {['queue', 'genres'].includes(activeTab) && (
+            {['queue'].includes(activeTab) && (
               <div className="empty-state"><h3>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h3><p>This architecture is coming soon!</p></div>
             )}
 
@@ -1533,7 +1634,7 @@ function App() {
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 5v10a3 3 0 1 0 3 3V8h3V5h-6z"></path><line x1="3" y1="6" x2="13" y2="6"></line><line x1="3" y1="12" x2="13" y2="12"></line><line x1="3" y1="18" x2="13" y2="18"></line></svg>
             </button>
 
-            <button className={`footer-btn ${(activeTab === 'playlists' || (activeTab === 'playlist-detail' && currentPlaylist && !currentPlaylist.isAlbum && !currentPlaylist.isArtist)) ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, (currentPlaylist && !currentPlaylist.isAlbum && !currentPlaylist.isArtist) ? 'playlist-detail' : 'playlists')}>
+            <button className={`footer-btn ${(activeTab === 'playlists' || (activeTab === 'playlist-detail' && currentPlaylist && !currentPlaylist.isAlbum && !currentPlaylist.isArtist && !currentPlaylist.isGenre)) ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, (currentPlaylist && !currentPlaylist.isAlbum && !currentPlaylist.isArtist && !currentPlaylist.isGenre) ? 'playlist-detail' : 'playlists')}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 8v10a2 2 0 0 0 2 2h10"></path>
                 <rect x="8" y="4" width="12" height="12" rx="2" ry="2"></rect>
@@ -1542,12 +1643,11 @@ function App() {
               </svg>
             </button>
 
-            {/* ARTIST BUTTON - UPDATED WITH SMART HIGHLIGHT */}
             <button className={`footer-btn ${(activeTab === 'artists' || (activeTab === 'playlist-detail' && currentPlaylist && currentPlaylist.isArtist)) ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, (currentPlaylist && currentPlaylist.isArtist) ? 'playlist-detail' : 'artists')}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
             </button>
 
-            <button className={`footer-btn ${activeTab === 'genres' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'genres')}>
+            <button className={`footer-btn ${(activeTab === 'genres' || (activeTab === 'playlist-detail' && currentPlaylist && currentPlaylist.isGenre)) ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, (currentPlaylist && currentPlaylist.isGenre) ? 'playlist-detail' : 'genres')}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
             </button>
 
@@ -1555,7 +1655,14 @@ function App() {
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
             </button>
 
-            <button className={`footer-btn ${showSearch ? 'active-tab' : ''}`} onClick={(e) => { e.stopPropagation(); navigateTo('list'); setShowSearch(!showSearch); }}>
+            {/* SMART SEARCH BUTTON */}
+            <button className={`footer-btn ${showSearch ? 'active-tab' : ''}`} onClick={(e) => { 
+              e.stopPropagation(); 
+              if (['detail', 'queue', 'settings', 'playlist-detail'].includes(activeTab)) {
+                navigateTo('list');
+              }
+              setShowSearch(!showSearch); 
+            }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             </button>
 
