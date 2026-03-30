@@ -79,16 +79,17 @@ body {
   font-size: 2.6rem;
   font-weight: normal;
   font-family: 'Kaushan Script', cursive;
-  /* --- ENHANCEMENT 1: More Vibrant Colours --- */
-  background: linear-gradient(90deg, #00FFFF, #1D55E0); /* Highly Saturated Cyan to Rich Blue */
+  background: linear-gradient(90deg, #00FFFF, #1D55E0);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
   letter-spacing: 1px;
-  /* --- ENHANCEMENT 2: Slight Embossed Effect --- */
-  text-shadow:
-    0.5px 0.5px 1px rgba(255, 255, 255, 0.2), /* Subtle white highlights create raised edges */
-    -0.5px -0.5px 1px rgba(0, 0, 0, 0.3);     /* Subtle dark shadow creates lift from the background */
+  
+  /* FIX 1: Gives the cursive 'y' room to breathe so it doesn't clip and turn grey */
+  padding-right: 10px; 
+  
+  /* FIX 2: A stronger, much cleaner 3D emboss effect that won't muddy the gradient */
+  filter: drop-shadow(-1px -1px 1px rgba(255, 255, 255, 0.3)) drop-shadow(2px 2px 3px rgba(0, 0, 0, 0.7));
 }
 
 @keyframes logo-pulse {
