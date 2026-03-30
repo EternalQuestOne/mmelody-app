@@ -57,10 +57,9 @@ function App() {
   const [showMoreDetails, setShowMoreDetails] = useState(false) 
   const [activeMenu, setActiveMenu] = useState(null)
   
-  // Smart 6-way menu state
   const [menuDirection, setMenuDirection] = useState({ vertical: 'top', horizontal: 'center' });
   
-  // Playlist State Variables
+  // Playlists State
   const [playlists, setPlaylists] = useState([]);
   const [playlistSortOrder, setPlaylistSortOrder] = useState('newest');
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
@@ -69,10 +68,15 @@ function App() {
   const playlistFileInputRef = useRef(null);
   const [editingPlaylistId, setEditingPlaylistId] = useState(null);
 
-  // Album State & Cloud Dictionary
+  // Albums State
   const albumFileInputRef = useRef(null);
   const [editingAlbumName, setEditingAlbumName] = useState(null);
   const [customAlbumArts, setCustomAlbumArts] = useState({});
+
+  // Artists State
+  const artistFileInputRef = useRef(null);
+  const [editingArtistName, setEditingArtistName] = useState(null);
+  const [customArtistArts, setCustomArtistArts] = useState({});
 
   // Detail View State
   const [currentPlaylist, setCurrentPlaylist] = useState(null);
@@ -139,6 +143,7 @@ function App() {
       getSongs();
       getPlaylists();
       getAlbumArts();
+      getArtistArts();
     }
   }, [])
 
@@ -161,6 +166,16 @@ function App() {
       const artsDict = {};
       data.forEach(item => { artsDict[item.name] = item.cover_url; });
       setCustomAlbumArts(artsDict);
+    }
+  }
+
+  async function getArtistArts() {
+    if (!supabase) return;
+    const { data } = await supabase.from('artist_arts').select('*');
+    if (data) {
+      const artsDict = {};
+      data.forEach(item => { artsDict[item.name] = item.cover_url; });
+      setCustomArtistArts(artsDict);
     }
   }
 
@@ -243,6 +258,7 @@ function App() {
     }
   };
 
+  // PLAYLIST ART HANDLERS
   const triggerPlaylistCoverUpload = (playlistId) => {
     setEditingPlaylistId(playlistId);
     playlistFileInputRef.current.click();
@@ -371,6 +387,69 @@ function App() {
       setCustomAlbumArts(prev => {
         const newDict = { ...prev };
         delete newDict[albumName];
+        return newDict;
+      });
+
+    } catch (err) { console.error("Cover delete error:", err); } 
+    finally { setIsUploading(false); setUploadProgressText(''); }
+  };
+
+  // ARTIST ART HANDLERS
+  const triggerArtistCoverUpload = (artistName) => {
+    setEditingArtistName(artistName);
+    artistFileInputRef.current.click();
+  };
+
+  const handleArtistCoverUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file || !editingArtistName) return;
+
+    setIsUploading(true);
+    setUploadProgressText("Uploading artist photo...");
+
+    try {
+      const oldCoverUrl = customArtistArts[editingArtistName];
+      if (oldCoverUrl) {
+        const oldCoverId = extractPublicId(oldCoverUrl);
+        if (oldCoverId) await fetch('/api/deleteImage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ public_id: oldCoverId })});
+      }
+
+      const imgFormData = new FormData();
+      imgFormData.append('file', file);
+      imgFormData.append('upload_preset', 'mMelody_preset');
+      const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${credentials.cloudinaryName}/image/upload`, { method: 'POST', body: imgFormData });
+      const newCoverUrl = (await imgRes.json()).secure_url;
+
+      await supabase.from('artist_arts').upsert([{ name: editingArtistName, cover_url: newCoverUrl }]);
+      setCustomArtistArts(prev => ({ ...prev, [editingArtistName]: newCoverUrl }));
+
+    } catch (err) { console.error("Artist cover upload error:", err); } 
+    finally {
+      setIsUploading(false);
+      setUploadProgressText('');
+      setEditingArtistName(null);
+      event.target.value = null;
+    }
+  };
+
+  const handleDeleteArtistCover = async (e, artistName) => {
+    e.stopPropagation();
+    if (!window.confirm(`Remove photo for ${artistName}?`)) return;
+    
+    setIsUploading(true);
+    setUploadProgressText("Removing photo...");
+
+    try {
+      const coverUrl = customArtistArts[artistName];
+      if (coverUrl) {
+        const coverId = extractPublicId(coverUrl);
+        if (coverId) await fetch('/api/deleteImage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ public_id: coverId })});
+      }
+      
+      await supabase.from('artist_arts').delete().eq('name', artistName);
+      setCustomArtistArts(prev => {
+        const newDict = { ...prev };
+        delete newDict[artistName];
         return newDict;
       });
 
@@ -569,7 +648,6 @@ function App() {
   const getDropdownStyle = () => {
     let style = { position: 'absolute', zIndex: 9999, minWidth: '160px' };
     
-    // CRITICAL FIX: Reset the CSS defaults so the menu doesn't squash itself!
     style.top = 'auto';
     style.bottom = 'auto';
     style.left = 'auto';
@@ -703,6 +781,24 @@ function App() {
   const handleOpenAlbum = (album) => {
     setCurrentPlaylist({ id: `album-${album.name}`, name: album.name, isAuto: true, isAlbum: true, cover_url: album.cover_url });
     setPlaylistSongs(album.songs); 
+    navigateTo('playlist-detail');
+  };
+
+  // ARTIST GROUPING LOGIC
+  const artistsMap = songs.reduce((acc, song) => {
+    const artistName = song.artist ? song.artist.trim() : 'Unknown Artist';
+    if (!acc[artistName]) {
+      acc[artistName] = { name: artistName, cover_url: customArtistArts[artistName] || null, songs: [] };
+    }
+    acc[artistName].songs.push(song);
+    return acc;
+  }, {});
+  
+  const artistsList = Object.values(artistsMap).sort((a, b) => a.name.localeCompare(b.name));
+
+  const handleOpenArtist = (artist) => {
+    setCurrentPlaylist({ id: `artist-${artist.name}`, name: artist.name, isAuto: true, isArtist: true, cover_url: artist.cover_url });
+    setPlaylistSongs(artist.songs); 
     navigateTo('playlist-detail');
   };
 
@@ -1037,7 +1133,7 @@ function App() {
                   
                   {/* DYNAMIC BACK BUTTON */}
                   <button className="back-btn" onClick={() => { 
-                      const targetTab = currentPlaylist.isAlbum ? 'albums' : 'playlists';
+                      const targetTab = currentPlaylist.isAlbum ? 'albums' : currentPlaylist.isArtist ? 'artists' : 'playlists';
                       setCurrentPlaylist(null); 
                       navigateTo(targetTab); 
                     }} style={{ padding: '5px 20px', color: '#56CCF2' }}>
@@ -1046,9 +1142,11 @@ function App() {
                   </button>
                   
                   <div className="pd-header-content">
-                    <div className={`pd-art ${currentPlaylist.isAuto ? 'liked-music-art' : ''}`}>
-                      {currentPlaylist.isAuto ? '❤️' : currentPlaylist.cover_url ? (
+                    <div className={`pd-art ${currentPlaylist.isAuto ? 'liked-music-art' : ''}`} style={currentPlaylist.isArtist ? { borderRadius: '50%' } : {}}>
+                      {currentPlaylist.isAuto && !currentPlaylist.isAlbum && !currentPlaylist.isArtist ? '❤️' : currentPlaylist.cover_url ? (
                         <img src={currentPlaylist.cover_url} alt="cover" className="playlist-list-img" />
+                      ) : currentPlaylist.isArtist ? (
+                        <svg width="40%" height="40%" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
                       ) : '💽'}
                     </div>
                     <div className="pd-info">
@@ -1099,7 +1197,7 @@ function App() {
                                 <div className="dropdown-menu" style={getDropdownStyle()}>
                                   <div className="dropdown-item" onClick={(e) => handleGoToDetails(e, song)}>📄 Go to Details</div>
                                   <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); handleToggleFavorite(song); }}>❤️ {song.is_favorite ? 'Remove Favorite' : 'Add Favorite'}</div>
-                                  {(!currentPlaylist.isAuto && !currentPlaylist.isAlbum) && (
+                                  {(!currentPlaylist.isAuto && !currentPlaylist.isAlbum && !currentPlaylist.isArtist) && (
                                     <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={(e) => handleRemoveFromPlaylist(e, song.id)}>🗑 Remove from Playlist</div>
                                   )}
                                 </div>
@@ -1211,7 +1309,6 @@ function App() {
                   </header>
                 </div>
                 
-                {/* Hidden input for Album Art */}
                 <input type="file" accept="image/*" ref={albumFileInputRef} onChange={handleAlbumCoverUpload} style={{ display: 'none' }} />
 
                 {albumsList.length === 0 ? (
@@ -1221,14 +1318,12 @@ function App() {
                     {albumsList.map((album, index) => (
                       <div key={`al-${index}`} style={{ display: 'flex', flexDirection: 'column', position: 'relative', background: 'rgba(255,255,255,0.03)', padding: '8px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
                         
-                        {/* 3-Dot Menu overlay for custom Album Art */}
                         <div style={{ position: 'absolute', top: '4px', right: '4px', zIndex: 10 }}>
                           <button className="menu-btn" style={{ background: 'rgba(0,0,0,0.75)', color: '#fff', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0', border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }} onClick={(e) => toggleMenu(e, `al-${album.name}`)}>
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
                           </button>
                         </div>
 
-                        {/* Centered Dropdown Menu relative to the CARD */}
                         {activeMenu === `al-${album.name}` && (
                           <div className="dropdown-menu" style={getDropdownStyle()}>
                             <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); triggerAlbumCoverUpload(album.name); }}>
@@ -1266,8 +1361,70 @@ function App() {
               </div>
             )}
 
+            {/* ARTISTS VIEW */}
+            {activeTab === 'artists' && (
+              <div className="app-container">
+                <div className="sticky-playlist-wrapper">
+                  <header className="ocean-header">
+                    <div className="ocean-glow"></div>
+                    <h2 className="ocean-title">Artists</h2>
+                  </header>
+                </div>
+                
+                <input type="file" accept="image/*" ref={artistFileInputRef} onChange={handleArtistCoverUpload} style={{ display: 'none' }} />
+
+                {artistsList.length === 0 ? (
+                  <div className="empty-state"><p>No artists found.</p></div>
+                ) : (
+                  <div className="tag-grid" style={{ padding: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '15px' }}>
+                    {artistsList.map((artist, index) => (
+                      <div key={`ar-${index}`} style={{ display: 'flex', flexDirection: 'column', position: 'relative', alignItems: 'center', background: 'transparent', padding: '5px' }}>
+                        
+                        <div style={{ position: 'absolute', top: '0px', right: '0px', zIndex: 10 }}>
+                          <button className="menu-btn" style={{ background: 'rgba(0,0,0,0.75)', color: '#fff', width: '26px', height: '26px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0', border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }} onClick={(e) => toggleMenu(e, `ar-${artist.name}`)}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                          </button>
+                        </div>
+
+                        {activeMenu === `ar-${artist.name}` && (
+                          <div className="dropdown-menu" style={getDropdownStyle()}>
+                            <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); triggerArtistCoverUpload(artist.name); }}>
+                              🖼 {customArtistArts[artist.name] ? 'Change Photo' : 'Add Photo'}
+                            </div>
+                            {customArtistArts[artist.name] && (
+                              <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleDeleteArtistCover(e, artist.name); }}>
+                                🗑 Remove Photo
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div onClick={() => handleOpenArtist(artist)} style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+                          <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: '50%', overflow: 'hidden', marginBottom: '8px', backgroundColor: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid rgba(255,255,255,0.05)', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+                            {isUploading && editingArtistName === artist.name ? (
+                              <span className="spinner-pulse" style={{ fontSize: '1.2rem' }}>⏳</span>
+                            ) : artist.cover_url ? (
+                              <img src={artist.cover_url} alt={artist.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <svg width="40%" height="40%" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
+                            )}
+                          </div>
+                          <div style={{ fontWeight: '600', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>
+                            {artist.name}
+                          </div>
+                          <div style={{ fontSize: '0.65rem', color: '#888', marginTop: '2px', textAlign: 'center' }}>
+                            {artist.songs.length} {artist.songs.length === 1 ? 'song' : 'songs'}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* COMING SOON TABS */}
-            {['queue', 'artists', 'genres'].includes(activeTab) && (
+            {['queue', 'genres'].includes(activeTab) && (
               <div className="empty-state"><h3>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h3><p>This architecture is coming soon!</p></div>
             )}
 
@@ -1364,23 +1521,19 @@ function App() {
           {/* FOOTER NAVBAR */}
           <nav className="bottom-footer">
             
-            {/* 1. List */}
             <button className={`footer-btn ${activeTab === 'list' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'list')}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg>
             </button>
 
-            {/* 2. Now Playing (Details) */}
             <button className={`footer-btn ${activeTab === 'detail' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'detail')}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
             </button>
 
-            {/* 3. Queue */}
             <button className={`footer-btn ${activeTab === 'queue' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'queue')}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 5v10a3 3 0 1 0 3 3V8h3V5h-6z"></path><line x1="3" y1="6" x2="13" y2="6"></line><line x1="3" y1="12" x2="13" y2="12"></line><line x1="3" y1="18" x2="13" y2="18"></line></svg>
             </button>
 
-            {/* 4. Playlist */}
-            <button className={`footer-btn ${(activeTab === 'playlists' || (activeTab === 'playlist-detail' && currentPlaylist && !currentPlaylist.isAlbum)) ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, (currentPlaylist && !currentPlaylist.isAlbum) ? 'playlist-detail' : 'playlists')}>
+            <button className={`footer-btn ${(activeTab === 'playlists' || (activeTab === 'playlist-detail' && currentPlaylist && !currentPlaylist.isAlbum && !currentPlaylist.isArtist)) ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, (currentPlaylist && !currentPlaylist.isAlbum && !currentPlaylist.isArtist) ? 'playlist-detail' : 'playlists')}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 8v10a2 2 0 0 0 2 2h10"></path>
                 <rect x="8" y="4" width="12" height="12" rx="2" ry="2"></rect>
@@ -1389,33 +1542,28 @@ function App() {
               </svg>
             </button>
 
-            {/* 5. Artist */}
-            <button className={`footer-btn ${activeTab === 'artists' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'artists')}>
+            {/* ARTIST BUTTON - UPDATED WITH SMART HIGHLIGHT */}
+            <button className={`footer-btn ${(activeTab === 'artists' || (activeTab === 'playlist-detail' && currentPlaylist && currentPlaylist.isArtist)) ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, (currentPlaylist && currentPlaylist.isArtist) ? 'playlist-detail' : 'artists')}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
             </button>
 
-            {/* 6. Genre */}
             <button className={`footer-btn ${activeTab === 'genres' ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, 'genres')}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
             </button>
 
-            {/* 7. Album */}
             <button className={`footer-btn ${(activeTab === 'albums' || (activeTab === 'playlist-detail' && currentPlaylist && currentPlaylist.isAlbum)) ? 'active-tab' : ''}`} onClick={(e) => handleFooterNavigation(e, (currentPlaylist && currentPlaylist.isAlbum) ? 'playlist-detail' : 'albums')}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
             </button>
 
-            {/* 8. Search */}
             <button className={`footer-btn ${showSearch ? 'active-tab' : ''}`} onClick={(e) => { e.stopPropagation(); navigateTo('list'); setShowSearch(!showSearch); }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             </button>
 
-            {/* 9. 3-Dot Menu */}
             <div className="menu-container" style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
               <button className="footer-btn" onClick={(e) => toggleMenu(e, 'footer-menu')}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
               </button>
 
-              {/* The popup menu that appears when you click the 3 dots */}
               {activeMenu === 'footer-menu' && (
                 <div className="dropdown-menu" style={{ ...getDropdownStyle(), right: '10px', bottom: '60px', left: 'auto', top: 'auto', minWidth: '160px', padding: '10px 0', transform: 'none' }}>
                   
