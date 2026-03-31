@@ -42,6 +42,7 @@ function App() {
   const [currentSong, setCurrentSong] = useState(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [showStopButton, setShowStopButton] = useState(false);
   const cancelUploadRef = useRef(false);
   const [isShuffle, setIsShuffle] = useState(false);
   
@@ -580,11 +581,23 @@ function App() {
     if (!window.confirm(`Permanently delete ${selectedIds.length} selected song(s)?`)) return;
 
     setIsUploading(true);
+    setShowStopButton(true);
     setUploadProgressText("Deleting from server...");
+    cancelUploadRef.current = false;
+
     const songsToDelete = songs.filter(s => selectedIds.includes(s.id));
+    const successfullyDeletedIds = [];
 
     try {
-      for (const song of songsToDelete) {
+      for (let i = 0; i < songsToDelete.length; i++) {
+        if (cancelUploadRef.current) {
+          showToast(`Deletion stopped. Deleted ${successfullyDeletedIds.length} of ${songsToDelete.length}.`);
+          break;
+        }
+
+        const song = songsToDelete[i];
+        setUploadProgressText(`Deleting ${i + 1} of ${songsToDelete.length}...`);
+
         const audioId = extractPublicId(song.audio_url);
         if (audioId) await fetch('/api/deleteAudio', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ public_id: audioId })});
         
@@ -593,16 +606,28 @@ function App() {
           if (coverId) await fetch('/api/deleteImage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ public_id: coverId })});
         }
         await supabase.from('songs').delete().eq('id', song.id);
+        
+        successfullyDeletedIds.push(song.id);
       }
-      setSongs(prev => prev.filter(s => !selectedIds.includes(s.id)));
+
+      setSongs(prev => prev.filter(s => !successfullyDeletedIds.includes(s.id)));
       setSelectedIds([]);
       setIsSelectionMode(false);
-      if (songsToDelete.find(s => s.id === currentSong?.id)) {
+      
+      if (songsToDelete.find(s => s.id === currentSong?.id && successfullyDeletedIds.includes(s.id))) {
         handleStop();
         setCurrentSong(null);
       }
+
+      if (!cancelUploadRef.current) {
+         showToast(`Deleted ${successfullyDeletedIds.length} songs successfully.`);
+      }
     } catch (err) { console.error("Deletion Error:", err); }
-    finally { setIsUploading(false); setUploadProgressText(''); }
+    finally { 
+      setIsUploading(false); 
+      setShowStopButton(false);
+      setUploadProgressText(''); 
+    }
   }
 
   const handleTimeUpdate = () => {
@@ -821,6 +846,7 @@ function App() {
     if (files.length === 0) return;
     
     setIsUploading(true);
+    setShowStopButton(true);
     cancelUploadRef.current = false;
 
     const BATCH_SIZE = 3;
@@ -923,6 +949,7 @@ function App() {
     }
 
     setIsUploading(false);
+    setShowStopButton(false);
     setUploadProgressText('');
     
     if (!cancelUploadRef.current) {
@@ -1241,12 +1268,14 @@ function App() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.05)', padding: '5px 15px', borderRadius: '25px', border: '1px solid rgba(255,255,255,0.1)' }}>
                         <span className="spinner-mini">⏳</span>
                         <span style={{ fontSize: '0.8rem', color: '#ccc' }}>{uploadProgressText}</span>
-                        <button 
-                          onClick={() => { cancelUploadRef.current = true; showToast("Cancelling..."); }} 
-                          style={{ background: '#ff4d4d', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: '15px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}
-                        >
-                          STOP
-                        </button>
+                        {showStopButton && (
+                          <button 
+                            onClick={() => { cancelUploadRef.current = true; showToast("Cancelling..."); }} 
+                            style={{ background: '#ff4d4d', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: '15px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}
+                          >
+                            STOP
+                          </button>
+                        )}
                       </div>
                     )}
                     <input type="file" accept="audio/mpeg, audio/mp3" multiple ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} />
