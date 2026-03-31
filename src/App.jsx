@@ -79,6 +79,8 @@ function App() {
   const [playlistSongs, setPlaylistSongs] = useState([]);
   const [showAddSongsModal, setShowAddSongsModal] = useState(false); 
   const [modalSearchTerm, setModalSearchTerm] = useState('');
+  const [modalSelectedIds, setModalSelectedIds] = useState([]); 
+  const [playlistTargetMode, setPlaylistTargetMode] = useState('single');
   
   // NEW: QUEUE & PLAYBACK STATE
   const [queueContext, setQueueContext] = useState('main'); 
@@ -103,52 +105,47 @@ function App() {
     return () => window.removeEventListener('popstate', handleHardwareBack);
   }, []);
 
-  // 1. Handle Play/Pause Icon Syncing (Runs ONLY when play state changes)
+  // The Ultimate Android 12 + 15 Lock Screen Sync
   useEffect(() => {
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-    }
-    MediaSession.setPlaybackState({ 
-      playbackState: isPlaying ? 'playing' : 'paused' 
-    }).catch(e => console.log("Playback state error:", e));
-  }, [isPlaying]);
-
-  // 2. Handle Lock Screen Data & Buttons (Runs ONLY when the song changes)
-  useEffect(() => {
-    const updateNativeLockScreen = async () => {
+    const syncProfessionalLockScreen = async () => {
       if (!currentSong) return;
 
-      // Force Cloudinary to serve a strict 500x500 JPEG format (f_jpg)
+      // 1. Prepare the artwork (Force JPG for Android compatibility)
       const optimizedArt = currentSong.cover_url 
         ? currentSong.cover_url.replace('/upload/', '/upload/w_500,h_500,c_fill,f_jpg/') 
-        : '';
-
-      // A. Standard Web API Fallback (Android Chrome uses this natively)
-      if ('mediaSession' in navigator) {
-        navigator.mediaSession.metadata = new MediaMetadata({
-          title: currentSong.title || 'Unknown Title',
-          artist: currentSong.artist || 'Unknown Artist',
-          album: currentSong.album || 'mMelody',
-          artwork: optimizedArt ? [{ src: optimizedArt, sizes: '512x512', type: 'image/jpeg' }] : []
-        });
-      }
+        : 'https://images.unsplash.com/photo-1614680376593-902f74a77789?w=500&h=500&fit=crop';
 
       try {
-        // B. Capacitor Native Plugin
+        // STEP 1: Build the Lock Screen Data
         await MediaSession.setMetadata({
           title: currentSong.title || 'Unknown Title',
           artist: currentSong.artist || 'Unknown Artist',
           album: currentSong.album || 'mMelody',
-          artwork: optimizedArt 
+          artwork: [{ src: optimizedArt, sizes: '512x512', type: 'image/jpeg' }]
         });
 
-        // Set up button handlers ONCE per song
-        await MediaSession.setActionHandler({ action: 'play' }, () => {
-          if (audioRef.current) { audioRef.current.play().catch(e=>console.log(e)); setIsPlaying(true); }
+        // STEP 2: Explicitly declare Play/Pause State IMMEDIATELY after Metadata
+        await MediaSession.setPlaybackState({ 
+          playbackState: isPlaying ? 'playing' : 'paused' 
         });
-        await MediaSession.setActionHandler({ action: 'pause' }, () => {
-          if (audioRef.current) { audioRef.current.pause(); setIsPlaying(false); }
+
+        // STEP 3: Attach the Button Handlers and force immediate UI updates
+        await MediaSession.setActionHandler({ action: 'play' }, async () => {
+          if (audioRef.current) { 
+            audioRef.current.play().catch(e => console.log("Play blocked:", e)); 
+            setIsPlaying(true); 
+            await MediaSession.setPlaybackState({ playbackState: 'playing' });
+          }
         });
+
+        await MediaSession.setActionHandler({ action: 'pause' }, async () => {
+          if (audioRef.current) { 
+            audioRef.current.pause(); 
+            setIsPlaying(false); 
+            await MediaSession.setPlaybackState({ playbackState: 'paused' });
+          }
+        });
+
         await MediaSession.setActionHandler({ action: 'previoustrack' }, () => handlePreviousSong());
         await MediaSession.setActionHandler({ action: 'nexttrack' }, () => handleNextSong());
         
@@ -157,8 +154,19 @@ function App() {
       }
     };
 
-    updateNativeLockScreen();
-  }, [currentSong, queueContext, playlistSongs, songs, isShuffle, userQueue]);
+    syncProfessionalLockScreen();
+
+    // STEP 4: Kill the hidden Web Browser's player so it stops stealing button clicks
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = null;
+      navigator.mediaSession.playbackState = 'none';
+      navigator.mediaSession.setActionHandler('play', null);
+      navigator.mediaSession.setActionHandler('pause', null);
+      navigator.mediaSession.setActionHandler('previoustrack', null);
+      navigator.mediaSession.setActionHandler('nexttrack', null);
+    }
+
+  }, [currentSong, isPlaying, queueContext, playlistSongs, songs, isShuffle, userQueue]);
 
   const navigateTo = (newTab) => {
     if (activeTab === newTab) return;
@@ -216,7 +224,6 @@ function App() {
     }
   }
 
-  // --- NEW: CLOUD SYNC LOGIC ---
   const handleRefreshData = async () => {
     setIsUploading(true);
     setUploadProgressText("Syncing cloud data...");
@@ -232,7 +239,6 @@ function App() {
     }
   };
 
-  // --- NEW: QUEUE HELPER FUNCTIONS ---
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(''), 3000);
@@ -245,17 +251,23 @@ function App() {
     showToast(`Added to Queue`);
   };
 
-  // Dynamically calculate the next upcoming songs for the Queue tab
   const getUpcomingSongs = () => {
     const currentList = queueContext === 'playlist' ? playlistSongs : sortedSongs;
     if (!currentList.length || !currentSong || isShuffle) return [];
     const currentIndex = currentList.findIndex(s => s.audio_url === currentSong.audio_url);
     if (currentIndex === -1 || currentIndex === currentList.length - 1) return [];
-    return currentList.slice(currentIndex + 1, currentIndex + 21); // Returns max 20 upcoming songs
+    return currentList.slice(currentIndex + 1, currentIndex + 21);
+  };
+
+  const handleOpenBulkPlaylistModal = () => {
+    setPlaylistTargetMode('multi');
+    setShowPlaylistModal(true);
+    setActiveMenu(null);
   };
 
   const handleOpenPlaylistModal = (song) => {
     setSongForPlaylist(song);
+    setPlaylistTargetMode('single');
     setShowPlaylistModal(true);
     setActiveMenu(null); 
   };
@@ -266,7 +278,11 @@ function App() {
     if (data) {
       setPlaylists([data[0], ...playlists]);
       setNewPlaylistName('');
-      if (songForPlaylist) await handleAddSongToPlaylist(data[0].id, songForPlaylist.id);
+      if (playlistTargetMode === 'multi' && selectedIds.length > 0) {
+         await handleAddSongToPlaylist(data[0].id, null);
+      } else if (songForPlaylist) {
+         await handleAddSongToPlaylist(data[0].id, songForPlaylist.id);
+      }
     }
   };
 
@@ -307,29 +323,58 @@ function App() {
     setActiveMenu(null);
   };
 
-  const handleAddSongFromDetail = async (song) => {
-    if (playlistSongs.some(s => s.id === song.id)) {
-      alert("This song is already in the playlist!");
-      return;
-    }
-
-    const { error } = await supabase.from('playlist_songs').insert([{ playlist_id: currentPlaylist.id, song_id: song.id }]);
-    
-    if (!error || error.code === '23505') { 
-      setPlaylistSongs(prev => [...prev, song]); 
-      setShowAddSongsModal(false); 
-    } else {
-      console.error("Error adding to playlist:", error);
-    }
+  const toggleModalSelection = (id) => {
+    setModalSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
-  const handleAddSongToPlaylist = async (playlistId, songId) => {
-    const { error } = await supabase.from('playlist_songs').insert([{ playlist_id: playlistId, song_id: songId }]);
-    if (error && error.code !== '23505') {
-      console.error("Error adding to playlist:", error);
+  const handleMultiAddSongsFromModal = async () => {
+    if (modalSelectedIds.length === 0) return;
+    setIsUploading(true);
+    setUploadProgressText("Adding songs...");
+    
+    const newEntries = modalSelectedIds.map(songId => ({
+      playlist_id: currentPlaylist.id,
+      song_id: songId
+    }));
+
+    const { error } = await supabase.from('playlist_songs').upsert(newEntries, { onConflict: 'playlist_id, song_id', ignoreDuplicates: true });
+    
+    if (!error) {
+      const songsToAdd = songs.filter(s => modalSelectedIds.includes(s.id) && !playlistSongs.some(ps => ps.id === s.id));
+      setPlaylistSongs(prev => [...prev, ...songsToAdd]);
+      setShowAddSongsModal(false);
+      setModalSelectedIds([]);
+      setModalSearchTerm('');
+      showToast(`${songsToAdd.length} songs added!`);
     } else {
-      setShowPlaylistModal(false);
-      setSongForPlaylist(null);
+      console.error("Error bulk adding:", error);
+    }
+    setIsUploading(false);
+  };
+
+  const handleAddSongToPlaylist = async (playlistId, singleSongId) => {
+    if (playlistTargetMode === 'multi') {
+      setIsUploading(true);
+      setUploadProgressText("Adding to playlist...");
+      const newEntries = selectedIds.map(id => ({ playlist_id: playlistId, song_id: id }));
+      
+      const { error } = await supabase.from('playlist_songs').upsert(newEntries, { onConflict: 'playlist_id, song_id', ignoreDuplicates: true });
+      if (!error) {
+        showToast(`${selectedIds.length} songs added!`);
+        setShowPlaylistModal(false);
+        setIsSelectionMode(false);
+        setSelectedIds([]);
+      }
+      setIsUploading(false);
+    } else {
+      const { error } = await supabase.from('playlist_songs').insert([{ playlist_id: playlistId, song_id: singleSongId }]);
+      if (error && error.code !== '23505') {
+        console.error("Error adding to playlist:", error);
+      } else {
+        showToast("Added to playlist!");
+        setShowPlaylistModal(false);
+        setSongForPlaylist(null);
+      }
     }
   };
 
@@ -595,7 +640,6 @@ function App() {
     if (!audioRef.current) return;
     setQueueContext(context);
 
-    // Track Location!
     if (context === 'main') {
       setPlayingFrom('Library: All Songs');
     } else if (context === 'playlist' && currentPlaylist) {
@@ -649,9 +693,7 @@ function App() {
     }
   }
 
-  // --- NEW: QUEUE ENABLED handleNextSong ---
   const handleNextSong = () => {
-    // 1. Always check user queue FIRST!
     if (userQueue.length > 0) {
       const nextSong = userQueue[0];
       setUserQueue(prev => prev.slice(1));
@@ -662,7 +704,6 @@ function App() {
       return;
     }
 
-    // 2. Normal playback sequence fallback
     const currentList = queueContext === 'playlist' ? playlistSongs : sortedSongs;
     if (!currentList.length || !currentSong) return;
     
@@ -1140,7 +1181,7 @@ function App() {
             {/* LIST VIEW */}
             {activeTab === 'list' && (
               <div className="app-container">
-                <header className="header attractive-header">
+                <header className="header attractive-header" style={{ position: 'relative', zIndex: 100, overflow: 'visible' }}>
                   <div className="header-bg-glow"></div>
                   <div className="brand-header-wrapper">
                       <img src={logoImage} alt="mMelody logo" className="app-logo" />
@@ -1154,23 +1195,37 @@ function App() {
                     <input type="file" accept="audio/mpeg, audio/mp3" multiple ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} />
                   </div>
 
-                  <div className="selection-toolbar">
-                    <div className="toolbar-left">
-                      <button className="action-icon-btn" onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }}>
-                        {isSelectionMode ? 'Cancel' : 'Select'}
-                      </button>
-                      {isSelectionMode && selectedIds.length > 0 && (
-                        <button className="delete-btn-red" onClick={handleDeleteSelected}>
-                          Delete ({selectedIds.length})
-                        </button>
-                      )}
-                    </div>
-                    <select className="sort-select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
-                      <option value="newest">Newest First</option>
-                      <option value="oldest">Oldest First</option>
-                      <option value="az">A-Z (Title)</option>
-                      <option value="za">Z-A (Title)</option>
-                    </select>
+                  <div className="selection-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 999 }}>
+                    <button className="action-icon-btn" onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }}>
+                      {isSelectionMode ? 'Cancel' : 'Select'}
+                    </button>
+                    
+                    {!isSelectionMode ? (
+                      <select className="sort-select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="az">A-Z (Title)</option>
+                        <option value="za">Z-A (Title)</option>
+                      </select>
+                    ) : (
+                      selectedIds.length > 0 && (
+                        <div className="menu-container" style={{ position: 'relative' }}>
+                          <button className="action-icon-btn" style={{ background: 'rgba(86, 204, 242, 0.15)', color: '#56CCF2', border: '1px solid rgba(86, 204, 242, 0.4)', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }} onClick={(e) => toggleMenu(e, 'bulk-actions')}>
+                            Actions ({selectedIds.length}) <span style={{ fontSize: '0.8rem' }}>▼</span>
+                          </button>
+                          {activeMenu === 'bulk-actions' && (
+                            <div className="dropdown-menu" style={{ ...getDropdownStyle(), position: 'absolute', right: 0, left: 'auto', transform: 'none', top: '100%', marginTop: '8px', zIndex: 999999 }}>
+                              <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleOpenBulkPlaylistModal(); }}>
+                                💽 Add to Playlist
+                              </div>
+                              <div className="dropdown-item" style={{color: '#ff4d4d'}} onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleDeleteSelected(); }}>
+                                🗑 Delete Selected
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    )}
                   </div>
 
                   {showSearch && (
@@ -1363,7 +1418,7 @@ function App() {
                     <button className="create-btn" onClick={handleCreatePlaylist}>Create</button>
                   </div>
 
-                  <div className="selection-toolbar" style={{ padding: '0 15px', marginTop: '-10px', marginBottom: '10px', justifyContent: 'flex-end' }}>
+                  <div className="selection-toolbar" style={{ padding: '0 15px', marginTop: '-10px', marginBottom: '10px', display: 'flex', justifyContent: 'flex-end' }}>
                     <select className="sort-select" value={playlistSortOrder} onChange={(e) => setPlaylistSortOrder(e.target.value)}>
                       <option value="newest">Newest First</option>
                       <option value="oldest">Oldest First</option>
@@ -1777,7 +1832,7 @@ function App() {
                     <p className="no-playlists-text">No playlists yet. Create one above!</p>
                   ) : (
                     playlists.map(pl => (
-                      <div key={pl.id} className="playlist-option-row" onClick={() => handleAddSongToPlaylist(pl.id, songForPlaylist.id)}>
+                      <div key={pl.id} className="playlist-option-row" onClick={() => handleAddSongToPlaylist(pl.id, songForPlaylist?.id)}>
                         <div className="pl-art-mini">
                           {pl.cover_url ? <img src={pl.cover_url} alt="cover" /> : '💽'}
                         </div>
@@ -1793,11 +1848,11 @@ function App() {
 
           {/* ADD SONGS TO PLAYLIST MODAL */}
           {showAddSongsModal && (
-            <div className="modal-overlay" onClick={() => { setShowAddSongsModal(false); setModalSearchTerm(''); }}>
+            <div className="modal-overlay" onClick={() => { setShowAddSongsModal(false); setModalSearchTerm(''); setModalSelectedIds([]); }}>
               <div className="modal-content" onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
                   <h3>Add Songs to {currentPlaylist?.name}</h3>
-                  <button className="close-modal" onClick={() => { setShowAddSongsModal(false); setModalSearchTerm(''); }}>×</button>
+                  <button className="close-modal" onClick={() => { setShowAddSongsModal(false); setModalSearchTerm(''); setModalSelectedIds([]); }}>×</button>
                 </div>
                 
                 <div className="modal-search-container" style={{ position: 'relative' }}>
@@ -1815,24 +1870,31 @@ function App() {
                   )}
                 </div>
 
-                <div className="playlist-options" style={{ maxHeight: '55vh', overflowY: 'auto' }}>
+                <div className="playlist-options" style={{ maxHeight: '45vh', overflowY: 'auto', marginBottom: '15px' }}>
                   {filteredModalSongs.length === 0 ? (
                     <p className="no-playlists-text">No songs found.</p>
                   ) : (
                     filteredModalSongs.map(song => {
                       const isAlreadyAdded = playlistSongs.some(s => s.id === song.id);
                       return (
-                        <div key={song.id} className="playlist-option-row" onClick={() => handleAddSongFromDetail(song)} style={{ opacity: isAlreadyAdded ? 0.5 : 1 }}>
+                        <div key={song.id} className="playlist-option-row" onClick={() => { if (!isAlreadyAdded) toggleModalSelection(song.id); }} style={{ opacity: isAlreadyAdded ? 0.5 : 1, cursor: isAlreadyAdded ? 'default' : 'pointer' }}>
+                          <div className={`custom-checkbox ${modalSelectedIds.includes(song.id) ? 'checked' : ''}`} style={{ marginRight: '12px' }}></div>
                           <div className="pl-art-mini">
                             {song.cover_url ? <img src={song.cover_url} alt="cover" /> : '🎵'}
                           </div>
                           <span className="pl-name">{song.title || 'Unknown Song'}</span>
-                          <span className="pl-add-icon">{isAlreadyAdded ? '✓' : '+'}</span>
+                          <span className="pl-add-icon">{isAlreadyAdded ? '✓' : ''}</span>
                         </div>
                       );
                     })
                   )}
                 </div>
+
+                {modalSelectedIds.length > 0 && (
+                  <button className="upload-btn" style={{ width: '100%' }} onClick={handleMultiAddSongsFromModal}>
+                    Add {modalSelectedIds.length} Song{modalSelectedIds.length > 1 ? 's' : ''}
+                  </button>
+                )}
               </div>
             </div>
           )}
