@@ -42,7 +42,7 @@ function App() {
   const [currentSong, setCurrentSong] = useState(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
-  const [cancelUpload, setCancelUpload] = useState(false); // FIXED: Added missing state
+  const cancelUploadRef = useRef(false);
   const [isShuffle, setIsShuffle] = useState(false);
   
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -821,21 +821,28 @@ function App() {
     if (files.length === 0) return;
     
     setIsUploading(true);
-    setCancelUpload(false); // Reset flag when starting a new upload
+    cancelUploadRef.current = false;
 
-    const BATCH_SIZE = 3; // Uploads 3 songs at a time for speed + stability
-    
-    for (let i = 0; i < files.length; i += BATCH_SIZE) {
-      // Stop loop immediately if user clicked cancel
-      if (cancelUpload) {
-        showToast("Upload cancelled");
+    const BATCH_SIZE = 3;
+    let processedCount = 0;
+    let i = 0;
+
+    // Use a while loop so we have absolute control over the iteration
+    while (i < files.length) {
+      // 1. The Ultimate Guard: Check before starting ANY new batch
+      if (cancelUploadRef.current) {
+        showToast(`Upload stopped. Saved ${processedCount} of ${files.length}.`);
         break; 
       }
 
       const chunk = files.slice(i, i + BATCH_SIZE);
       setUploadProgressText(`Uploading ${i + 1}-${Math.min(i + BATCH_SIZE, files.length)} of ${files.length}...`);
 
+      // We still process in parallel for speed, but wrap it tightly
       await Promise.all(chunk.map(async (file) => {
+        // 2. The Mid-Flight Guard: Check before even creating the audio element
+        if (cancelUploadRef.current) return;
+
         return new Promise((resolve) => {
           const objectURL = URL.createObjectURL(file);
           const tempAudio = new Audio(objectURL);
@@ -849,8 +856,8 @@ function App() {
             jsmediatags.read(file, {
               onSuccess: async function(tag) {
                 try {
-                  // Prevent DB save if canceled mid-flight
-                  if (cancelUpload) { resolve(); return; }
+                  // 3. The Pre-Network Guard: Check before expensive Cloudinary fetch
+                  if (cancelUploadRef.current) { resolve(); return; }
 
                   const tags = tag.tags;
                   let coverUrl = '';
@@ -864,6 +871,9 @@ function App() {
                     const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${credentials.cloudinaryName}/image/upload`, { method: 'POST', body: imgFormData });
                     coverUrl = (await imgRes.json()).secure_url;
                   }
+                  
+                  // 4. The Post-Network Guard: Check before database insertion
+                  if (cancelUploadRef.current) { resolve(); return; }
 
                   const audioFormData = new FormData();
                   audioFormData.append('file', file);
@@ -889,10 +899,13 @@ function App() {
                     created_at: new Date().toISOString()
                   };
 
-                  // Final check before DB write
-                  if (!cancelUpload) {
+                  // 5. The Absolute Final Check
+                  if (!cancelUploadRef.current) {
                     const { data } = await supabase.from('songs').insert([newSong]).select();
-                    if (data) setSongs(prev => [data[0], ...prev]);
+                    if (data) {
+                      setSongs(prev => [data[0], ...prev]);
+                      processedCount++;
+                    }
                   }
                 } catch (err) { console.error("Upload error:", err); } 
                 finally { resolve(); }
@@ -904,17 +917,20 @@ function App() {
           tempAudio.addEventListener('error', () => resolve());
         });
       }));
+
+      // Only advance the loop index after the chunk has fully resolved
+      i += BATCH_SIZE;
     }
 
     setIsUploading(false);
     setUploadProgressText('');
-    setCancelUpload(false); // Reset flag when done
-    if (fileInputRef.current) fileInputRef.current.value = null; 
     
-    // Only show success toast if we didn't cancel
-    if (!cancelUpload) {
-       showToast(`${files.length} songs processed!`);
+    if (!cancelUploadRef.current) {
+       showToast(`${processedCount} songs processed successfully!`);
     }
+    
+    cancelUploadRef.current = false; 
+    if (fileInputRef.current) fileInputRef.current.value = null; 
   }
 
   const toggleSelection = (id) => {
@@ -1226,7 +1242,7 @@ function App() {
                         <span className="spinner-mini">⏳</span>
                         <span style={{ fontSize: '0.8rem', color: '#ccc' }}>{uploadProgressText}</span>
                         <button 
-                          onClick={() => setCancelUpload(true)} 
+                          onClick={() => { cancelUploadRef.current = true; showToast("Cancelling..."); }} 
                           style={{ background: '#ff4d4d', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: '15px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}
                         >
                           STOP
