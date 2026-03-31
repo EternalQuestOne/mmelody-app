@@ -42,6 +42,7 @@ function App() {
   const [currentSong, setCurrentSong] = useState(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [cancelUpload, setCancelUpload] = useState(false); // FIXED: Added missing state
   const [isShuffle, setIsShuffle] = useState(false);
   
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -814,79 +815,106 @@ function App() {
     setActiveMenu(null);
   }
 
+  // FIXED BATCH UPLOAD FUNCTION
   const handleFileUpload = async (event) => {
     const files = Array.from(event.target.files);
     if (files.length === 0) return;
+    
     setIsUploading(true);
+    setCancelUpload(false); // Reset flag when starting a new upload
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      setUploadProgressText(`Uploading ${i + 1} of ${files.length}...`);
+    const BATCH_SIZE = 3; // Uploads 3 songs at a time for speed + stability
+    
+    for (let i = 0; i < files.length; i += BATCH_SIZE) {
+      // Stop loop immediately if user clicked cancel
+      if (cancelUpload) {
+        showToast("Upload cancelled");
+        break; 
+      }
 
-      await new Promise((resolve) => {
-        const objectURL = URL.createObjectURL(file);
-        const tempAudio = new Audio(objectURL);
-        
-        tempAudio.addEventListener('loadedmetadata', () => {
-          const mins = Math.floor(tempAudio.duration / 60);
-          const secs = Math.floor(tempAudio.duration % 60).toString().padStart(2, '0');
-          const durationStr = `${mins}:${secs}`;
-          URL.revokeObjectURL(objectURL);
+      const chunk = files.slice(i, i + BATCH_SIZE);
+      setUploadProgressText(`Uploading ${i + 1}-${Math.min(i + BATCH_SIZE, files.length)} of ${files.length}...`);
 
-          jsmediatags.read(file, {
-            onSuccess: async function(tag) {
-              try {
-                const tags = tag.tags;
-                let coverUrl = '';
+      await Promise.all(chunk.map(async (file) => {
+        return new Promise((resolve) => {
+          const objectURL = URL.createObjectURL(file);
+          const tempAudio = new Audio(objectURL);
 
-                if (tags.picture) {
-                  const byteArray = new Uint8Array(tags.picture.data);
-                  const blob = new Blob([byteArray], { type: tags.picture.format });
-                  const imgFormData = new FormData();
-                  imgFormData.append('file', blob);
-                  imgFormData.append('upload_preset', 'mMelody_preset');
-                  const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${credentials.cloudinaryName}/image/upload`, { method: 'POST', body: imgFormData });
-                  coverUrl = (await imgRes.json()).secure_url;
-                }
+          tempAudio.addEventListener('loadedmetadata', () => {
+            const mins = Math.floor(tempAudio.duration / 60);
+            const secs = Math.floor(tempAudio.duration % 60).toString().padStart(2, '0');
+            const durationStr = `${mins}:${secs}`;
+            URL.revokeObjectURL(objectURL);
 
-                const audioFormData = new FormData();
-                audioFormData.append('file', file);
-                audioFormData.append('upload_preset', 'mMelody_preset');
-                const audioRes = await fetch(`https://api.cloudinary.com/v1_1/${credentials.cloudinaryName}/video/upload`, { method: 'POST', body: audioFormData });
-                const audioUrl = (await audioRes.json()).secure_url;
+            jsmediatags.read(file, {
+              onSuccess: async function(tag) {
+                try {
+                  // Prevent DB save if canceled mid-flight
+                  if (cancelUpload) { resolve(); return; }
 
-                const newSong = {
-                  title: tags.title || file.name.replace('.mp3', ''),
-                  subtitle: extractTagText(tags.TIT3) || '',
-                  artist: tags.artist || '',
-                  album: tags.album || '',
-                  genre: tags.genre || '',
-                  release_year: tags.year || '',
-                  duration: durationStr,
-                  comment: extractTagText(tags.COMM) || '',
-                  composer: extractTagText(tags.TCOM) || '', 
-                  lyricist: extractTagText(tags.TEXT) || extractTagText(tags.TOLY) || '',
-                  lyrics: extractTagText(tags.USLT) || extractTagText(tags.SYLT) || '', 
-                  audio_url: audioUrl,
-                  cover_url: coverUrl,
-                  is_favorite: false,
-                  created_at: new Date().toISOString()
-                };
+                  const tags = tag.tags;
+                  let coverUrl = '';
 
-                const { data } = await supabase.from('songs').insert([newSong]).select();
-                if (data) setSongs(prev => [data[0], ...prev]);
-              } catch (err) { console.error("Upload error:", err); } 
-              finally { resolve(); }
-            },
-            onError: function() { resolve(); }
+                  if (tags.picture) {
+                    const byteArray = new Uint8Array(tags.picture.data);
+                    const blob = new Blob([byteArray], { type: tags.picture.format });
+                    const imgFormData = new FormData();
+                    imgFormData.append('file', blob);
+                    imgFormData.append('upload_preset', 'mMelody_preset');
+                    const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${credentials.cloudinaryName}/image/upload`, { method: 'POST', body: imgFormData });
+                    coverUrl = (await imgRes.json()).secure_url;
+                  }
+
+                  const audioFormData = new FormData();
+                  audioFormData.append('file', file);
+                  audioFormData.append('upload_preset', 'mMelody_preset');
+                  const audioRes = await fetch(`https://api.cloudinary.com/v1_1/${credentials.cloudinaryName}/video/upload`, { method: 'POST', body: audioFormData });
+                  const audioUrl = (await audioRes.json()).secure_url;
+
+                  const newSong = {
+                    title: tags.title || file.name.replace('.mp3', ''),
+                    subtitle: extractTagText(tags.TIT3) || '',
+                    artist: tags.artist || '',
+                    album: tags.album || '',
+                    genre: tags.genre || '',
+                    release_year: tags.year || '',
+                    duration: durationStr,
+                    comment: extractTagText(tags.COMM) || '',
+                    composer: extractTagText(tags.TCOM) || '', 
+                    lyricist: extractTagText(tags.TEXT) || extractTagText(tags.TOLY) || '',
+                    lyrics: extractTagText(tags.USLT) || extractTagText(tags.SYLT) || '', 
+                    audio_url: audioUrl,
+                    cover_url: coverUrl,
+                    is_favorite: false,
+                    created_at: new Date().toISOString()
+                  };
+
+                  // Final check before DB write
+                  if (!cancelUpload) {
+                    const { data } = await supabase.from('songs').insert([newSong]).select();
+                    if (data) setSongs(prev => [data[0], ...prev]);
+                  }
+                } catch (err) { console.error("Upload error:", err); } 
+                finally { resolve(); }
+              },
+              onError: function() { resolve(); }
+            });
           });
+          
+          tempAudio.addEventListener('error', () => resolve());
         });
-      });
+      }));
     }
+
     setIsUploading(false);
     setUploadProgressText('');
-    
+    setCancelUpload(false); // Reset flag when done
     if (fileInputRef.current) fileInputRef.current.value = null; 
+    
+    // Only show success toast if we didn't cancel
+    if (!cancelUpload) {
+       showToast(`${files.length} songs processed!`);
+    }
   }
 
   const toggleSelection = (id) => {
@@ -1188,33 +1216,39 @@ function App() {
                       <h2>mMelody</h2>
                   </div>
                   
-                  <div className="upload-container">
-                    <button className="upload-btn" onClick={() => fileInputRef.current.click()} disabled={isUploading}>
-                      {isUploading ? `⏳ ${uploadProgressText}` : 'Upload Music'}
-                    </button>
+                  <div className="upload-container" style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                    {!isUploading ? (
+                      <button className="upload-btn" onClick={() => fileInputRef.current.click()}>
+                        Upload Music
+                      </button>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.05)', padding: '5px 15px', borderRadius: '25px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <span className="spinner-mini">⏳</span>
+                        <span style={{ fontSize: '0.8rem', color: '#ccc' }}>{uploadProgressText}</span>
+                        <button 
+                          onClick={() => setCancelUpload(true)} 
+                          style={{ background: '#ff4d4d', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: '15px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}
+                        >
+                          STOP
+                        </button>
+                      </div>
+                    )}
                     <input type="file" accept="audio/mpeg, audio/mp3" multiple ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} />
                   </div>
 
                   <div className="selection-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 999 }}>
-                    <button className="action-icon-btn" onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }}>
-                      {isSelectionMode ? 'Cancel' : 'Select'}
-                    </button>
-                    
-                    {!isSelectionMode ? (
-                      <select className="sort-select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
-                        <option value="newest">Newest First</option>
-                        <option value="oldest">Oldest First</option>
-                        <option value="az">A-Z (Title)</option>
-                        <option value="za">Z-A (Title)</option>
-                      </select>
-                    ) : (
-                      selectedIds.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <button className="action-icon-btn" onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }}>
+                        {isSelectionMode ? 'Cancel' : 'Select'}
+                      </button>
+                      
+                      {isSelectionMode && selectedIds.length > 0 && (
                         <div className="menu-container" style={{ position: 'relative' }}>
                           <button className="action-icon-btn" style={{ background: 'rgba(86, 204, 242, 0.15)', color: '#56CCF2', border: '1px solid rgba(86, 204, 242, 0.4)', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }} onClick={(e) => toggleMenu(e, 'bulk-actions')}>
                             Actions ({selectedIds.length}) <span style={{ fontSize: '0.8rem' }}>▼</span>
                           </button>
                           {activeMenu === 'bulk-actions' && (
-                            <div className="dropdown-menu" style={{ ...getDropdownStyle(), position: 'absolute', right: 0, left: 'auto', transform: 'none', top: '100%', marginTop: '8px', zIndex: 999999 }}>
+                            <div className="dropdown-menu" style={{ ...getDropdownStyle(), position: 'absolute', right: 'auto', left: 0, transform: 'none', top: '100%', marginTop: '8px', zIndex: 999999 }}>
                               <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleOpenBulkPlaylistModal(); }}>
                                 💽 Add to Playlist
                               </div>
@@ -1224,7 +1258,16 @@ function App() {
                             </div>
                           )}
                         </div>
-                      )
+                      )}
+                    </div>
+                    
+                    {!isSelectionMode && (
+                      <select className="sort-select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="az">A-Z (Title)</option>
+                        <option value="za">Z-A (Title)</option>
+                      </select>
                     )}
                   </div>
 
