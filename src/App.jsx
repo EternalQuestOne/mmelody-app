@@ -1286,6 +1286,12 @@ function App() {
                       <button className="action-icon-btn" onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }}>
                         {isSelectionMode ? 'Cancel' : 'Select'}
                       </button>
+
+                      {!isSelectionMode && (
+                        <span style={{ fontSize: '0.85rem', color: '#888', fontWeight: '600', marginLeft: '5px' }}>
+                          {searchTerm ? `${filteredSongs.length} found` : `${songs.length} songs`}
+                        </span>
+                      )}
                       
                       {isSelectionMode && selectedIds.length > 0 && (
                         <div className="menu-container" style={{ position: 'relative' }}>
