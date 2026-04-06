@@ -1426,7 +1426,7 @@ function App() {
                       {currentPlaylist.isAuto && !currentPlaylist.isAlbum && !currentPlaylist.isArtist && !currentPlaylist.isGenre ? '❤️' : currentPlaylist.cover_url ? (
                         <img src={currentPlaylist.cover_url} alt="cover" className="playlist-list-img" />
                       ) : currentPlaylist.isArtist ? (
-                        <svg width="40%" height="40%" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
+                        <img src={defaultArtistImage} alt="artist cover" className="playlist-list-img" />
                       ) : '💽'}
                     </div>
                     <div className="pd-info">
@@ -1736,7 +1736,7 @@ function App() {
                             ) : artist.cover_url ? (
                               <img src={artist.cover_url} alt={artist.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             ) : (
-                              <svg width="40%" height="40%" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
+                              <img src={defaultArtistImage} alt="default artist" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             )}
                           </div>
                           <div style={{ fontWeight: '600', fontSize: '0.75rem', display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden', width: '100%', textAlign: 'center', lineHeight: '1.2' }}>
