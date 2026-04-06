@@ -1705,7 +1705,7 @@ function App() {
                 {filteredArtists.length === 0 ? (
                   <div className="empty-state"><p>No artists found.</p></div>
                 ) : (
-                  <div className="tag-grid" style={{ padding: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(95px, 1fr))', gap: '15px' }}>
+                  <div className="tag-grid" style={{ padding: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '15px' }}>
                     {filteredArtists.map((artist, index) => (
                       <div key={`ar-${index}`} style={{ display: 'flex', flexDirection: 'column', position: 'relative', alignItems: 'center', background: 'transparent', padding: '5px' }}>
                         
@@ -1738,7 +1738,7 @@ function App() {
                               <svg width="40%" height="40%" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
                             )}
                           </div>
-                          <div style={{ fontWeight: '600', fontSize: '0.75rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', width: '100%', textAlign: 'center', lineHeight: '1.2' }}>
+                          <div style={{ fontWeight: '600', fontSize: '0.75rem', display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden', width: '100%', textAlign: 'center', lineHeight: '1.2' }}>
                             {artist.name}
                           </div>
                           <div style={{ fontSize: '0.65rem', color: '#888', marginTop: '2px', textAlign: 'center' }}>
