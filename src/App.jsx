@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient'
 import jsmediatags from 'jsmediatags/dist/jsmediatags.min.js'
 import './App.css'
 import logoImage from './logo.png'
+import defaultArtistImage from './Mic-Default.jpg'
 import { MediaSession } from '@capgo/capacitor-media-session';
 
 const extractTagText = (frame) => {
