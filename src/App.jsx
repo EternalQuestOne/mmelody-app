@@ -1627,7 +1627,7 @@ function App() {
                 {filteredAlbums.length === 0 ? (
                   <div className="empty-state"><p>No albums found.</p></div>
                 ) : (
-                  <div className="tag-grid" style={{ padding: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(85px, 1fr))', gap: '12px' }}>
+                  <div className="tag-grid" style={{ padding: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(95px, 1fr))', gap: '12px' }}>
                     {filteredAlbums.map((album, index) => (
                       <div key={`al-${index}`} style={{ display: 'flex', flexDirection: 'column', position: 'relative', background: 'rgba(255,255,255,0.03)', padding: '8px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
                         
@@ -1660,7 +1660,7 @@ function App() {
                               <svg width="50%" height="50%" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle><circle cx="12" cy="12" r="1"></circle></svg>
                             )}
                           </div>
-                          <div style={{ fontWeight: '600', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <div style={{ fontWeight: '600', fontSize: '0.75rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', width: '100%', textAlign: 'center', lineHeight: '1.2' }}>
                             {album.name}
                           </div>
                           <div style={{ fontSize: '0.65rem', color: '#888', marginTop: '2px' }}>
@@ -1705,7 +1705,7 @@ function App() {
                 {filteredArtists.length === 0 ? (
                   <div className="empty-state"><p>No artists found.</p></div>
                 ) : (
-                  <div className="tag-grid" style={{ padding: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '15px' }}>
+                  <div className="tag-grid" style={{ padding: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(95px, 1fr))', gap: '15px' }}>
                     {filteredArtists.map((artist, index) => (
                       <div key={`ar-${index}`} style={{ display: 'flex', flexDirection: 'column', position: 'relative', alignItems: 'center', background: 'transparent', padding: '5px' }}>
                         
@@ -1738,7 +1738,7 @@ function App() {
                               <svg width="40%" height="40%" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
                             )}
                           </div>
-                          <div style={{ fontWeight: '600', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>
+                          <div style={{ fontWeight: '600', fontSize: '0.75rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', width: '100%', textAlign: 'center', lineHeight: '1.2' }}>
                             {artist.name}
                           </div>
                           <div style={{ fontSize: '0.65rem', color: '#888', marginTop: '2px', textAlign: 'center' }}>
@@ -1784,7 +1784,7 @@ function App() {
                   <div className="tag-grid" style={{ padding: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '12px' }}>
                     {filteredGenres.map((genre, index) => (
                       <div key={`gn-${index}`} onClick={() => handleOpenGenre(genre)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'linear-gradient(135deg, rgba(86, 204, 242, 0.15), rgba(47, 128, 237, 0.15))', padding: '10px', borderRadius: '12px', border: '1px solid rgba(86, 204, 242, 0.3)', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', aspectRatio: '1/1', textAlign: 'center' }}>
-                        <div style={{ fontWeight: '700', fontSize: '0.95rem', color: '#fff', marginBottom: '6px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#fff', marginBottom: '6px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                           {genre.name}
                         </div>
                         <div style={{ fontSize: '0.7rem', color: '#56CCF2' }}>
