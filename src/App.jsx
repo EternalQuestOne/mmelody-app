@@ -40,6 +40,9 @@ function App() {
   
   const [songs, setSongs] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [playlistSearchTerm, setPlaylistSearchTerm] = useState('') 
+  const [playlistDetailSortOrders, setPlaylistDetailSortOrders] = useState({})
+
   const [currentSong, setCurrentSong] = useState(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -183,6 +186,7 @@ function App() {
     e.stopPropagation();
     setShowMoreDetails(false); 
     setActiveMenu(null); 
+    setPlaylistSearchTerm(''); // Clear internal search
     navigateTo(tab);
   };
 
@@ -975,6 +979,19 @@ function App() {
     (song.artist && song.artist.toLowerCase().includes(modalSearchTerm.toLowerCase()))
   );
 
+  const currentSortOrder = currentPlaylist ? (playlistDetailSortOrders[currentPlaylist.id] || 'newest') : 'newest';
+  const sortedPlaylistDetailSongs = [...playlistSongs].sort((a, b) => {
+    if (currentSortOrder === 'az') return (a.title || '').localeCompare(b.title || '');
+    if (currentSortOrder === 'za') return (b.title || '').localeCompare(a.title || '');
+    if (currentSortOrder === 'oldest') return new Date(a.created_at) - new Date(b.created_at);
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
+
+  const filteredPlaylistSongs = sortedPlaylistDetailSongs.filter(song =>
+    (song.title && song.title.toLowerCase().includes(playlistSearchTerm.toLowerCase())) ||
+    (song.artist && song.artist.toLowerCase().includes(playlistSearchTerm.toLowerCase()))
+  );
+
   const filteredPlaylists = sortedPlaylists.filter(pl => 
     (pl.name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -1415,6 +1432,7 @@ function App() {
                   <button className="back-btn" onClick={() => { 
                       const targetTab = currentPlaylist.isAlbum ? 'albums' : currentPlaylist.isArtist ? 'artists' : currentPlaylist.isGenre ? 'genres' : 'playlists';
                       setCurrentPlaylist(null); 
+                      setPlaylistSearchTerm(''); // Clear internal search on back
                       navigateTo(targetTab); 
                     }} style={{ padding: '5px 20px', color: '#56CCF2' }}>
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
@@ -1440,13 +1458,44 @@ function App() {
                       )}
                     </div>
                   </div>
+
+                  {playlistSongs.length > 0 && (
+                    <div style={{ padding: '10px 15px 0 15px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <span style={{ fontSize: '0.85rem', color: '#888', fontWeight: '600' }}>
+                          {playlistSearchTerm ? `${filteredPlaylistSongs.length} found` : `${playlistSongs.length} songs`}
+                        </span>
+                        <select className="sort-select" value={currentPlaylist ? (playlistDetailSortOrders[currentPlaylist.id] || 'newest') : 'newest'} onChange={(e) => setPlaylistDetailSortOrders(prev => ({ ...prev, [currentPlaylist.id]: e.target.value }))}>
+                          <option value="newest">Newest First</option>
+                          <option value="oldest">Oldest First</option>
+                          <option value="az">A-Z (Title)</option>
+                          <option value="za">Z-A (Title)</option>
+                        </select>
+                      </div>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type="text"
+                          placeholder="Search in this list..."
+                          className="search-bar animate-search"
+                          value={playlistSearchTerm}
+                          onChange={(e) => setPlaylistSearchTerm(e.target.value)}
+                          style={{ marginBottom: 0, paddingRight: '40px', width: '100%', boxSizing: 'border-box' }}
+                        />
+                        {playlistSearchTerm && (
+                          <button onClick={() => setPlaylistSearchTerm('')} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="song-list">
                   {playlistSongs.length === 0 ? (
                     <div className="empty-state"><h3>It's quiet here...</h3><p>Add some songs to this playlist!</p></div>
+                  ) : filteredPlaylistSongs.length === 0 ? (
+                    <div className="empty-state"><p>No songs match your search.</p></div>
                   ) : (
-                    playlistSongs.map((song, index) => {
+                    filteredPlaylistSongs.map((song, index) => {
                       const isThisPlaying = currentSong && currentSong.audio_url === song.audio_url;
                       const uniqueId = `pd-${song.id || index}`;
 
