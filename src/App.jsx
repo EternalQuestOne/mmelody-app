@@ -1,3 +1,4 @@
+import Visualizer from './Visualizer';
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabaseClient'
 import jsmediatags from 'jsmediatags/dist/jsmediatags.min.js'
@@ -1117,6 +1118,7 @@ function App() {
           <audio 
             ref={audioRef} 
             src={currentSong?.audio_url || ''}
+            crossOrigin="anonymous"
             autoPlay={isPlaying}
             onEnded={handleNextSong} 
             onTimeUpdate={handleTimeUpdate}
@@ -1142,6 +1144,8 @@ function App() {
                     )}
                   </div>
                   
+                  <Visualizer audioRef={audioRef} isPlaying={isPlaying} />
+
                   <div className="scrolling-wrapper">
                     <div className="scrolling-text">
                       <span className="scroll-title">{currentSong.title || 'Unknown Title'}</span>
@@ -2106,7 +2110,7 @@ function App() {
               {activeMenu === 'footer-menu' && (
                 <div className="dropdown-menu" style={{ ...getDropdownStyle(), right: '10px', bottom: '60px', left: 'auto', top: 'auto', minWidth: '160px', padding: '10px 0', transform: 'none' }}>
                   
-                  {/* NEW: Dedicated Cloud Sync Button! */}
+                  {/* Dedicated Cloud Sync Button! */}
                   <div className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 15px' }} onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleRefreshData(); }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#56CCF2" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="23 4 23 10 17 10"></polyline>
