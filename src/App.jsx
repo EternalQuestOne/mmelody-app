@@ -1290,14 +1290,12 @@ function App() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.05)', padding: '5px 15px', borderRadius: '25px', border: '1px solid rgba(255,255,255,0.1)' }}>
                         <span className="spinner-mini">⏳</span>
                         <span style={{ fontSize: '0.8rem', color: '#ccc' }}>{uploadProgressText}</span>
-                        {showStopButton && (
-                          <button 
-                            onClick={() => { cancelUploadRef.current = true; showToast("Cancelling..."); }} 
-                            style={{ background: '#ff4d4d', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: '15px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}
-                          >
-                            STOP
-                          </button>
-                        )}
+                        <button 
+                          onClick={() => setCancelUpload(true)} 
+                          style={{ background: '#ff4d4d', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: '15px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}
+                        >
+                          STOP
+                        </button>
                       </div>
                     )}
                     <input type="file" accept="audio/mpeg, audio/mp3" multiple ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} />
@@ -1308,12 +1306,6 @@ function App() {
                       <button className="action-icon-btn" onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }}>
                         {isSelectionMode ? 'Cancel' : 'Select'}
                       </button>
-
-                      {!isSelectionMode && (
-                        <span style={{ fontSize: '0.85rem', color: '#888', fontWeight: '600', marginLeft: '5px' }}>
-                          {searchTerm ? `${filteredSongs.length} found` : `${songs.length} songs`}
-                        </span>
-                      )}
                       
                       {isSelectionMode && selectedIds.length > 0 && (
                         <div className="menu-container" style={{ position: 'relative' }}>
