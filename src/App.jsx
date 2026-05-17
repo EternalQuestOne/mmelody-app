@@ -1,8 +1,10 @@
+import Visualizer from './Visualizer';
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabaseClient'
 import jsmediatags from 'jsmediatags/dist/jsmediatags.min.js'
 import './App.css'
 import logoImage from './logo.png'
+import defaultArtistImage from './Mic-Default.jpg'
 import { MediaSession } from '@capgo/capacitor-media-session';
 
 const extractTagText = (frame) => {
@@ -39,9 +41,14 @@ function App() {
   
   const [songs, setSongs] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [playlistSearchTerm, setPlaylistSearchTerm] = useState('') 
+  const [playlistDetailSortOrders, setPlaylistDetailSortOrders] = useState({})
+
   const [currentSong, setCurrentSong] = useState(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [showStopButton, setShowStopButton] = useState(false);
+  const cancelUploadRef = useRef(false);
   const [isShuffle, setIsShuffle] = useState(false);
   
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -180,6 +187,7 @@ function App() {
     e.stopPropagation();
     setShowMoreDetails(false); 
     setActiveMenu(null); 
+    setPlaylistSearchTerm(''); // Clear internal search
     navigateTo(tab);
   };
 
@@ -579,11 +587,23 @@ function App() {
     if (!window.confirm(`Permanently delete ${selectedIds.length} selected song(s)?`)) return;
 
     setIsUploading(true);
+    setShowStopButton(true);
     setUploadProgressText("Deleting from server...");
+    cancelUploadRef.current = false;
+
     const songsToDelete = songs.filter(s => selectedIds.includes(s.id));
+    const successfullyDeletedIds = [];
 
     try {
-      for (const song of songsToDelete) {
+      for (let i = 0; i < songsToDelete.length; i++) {
+        if (cancelUploadRef.current) {
+          showToast(`Deletion stopped. Deleted ${successfullyDeletedIds.length} of ${songsToDelete.length}.`);
+          break;
+        }
+
+        const song = songsToDelete[i];
+        setUploadProgressText(`Deleting ${i + 1} of ${songsToDelete.length}...`);
+
         const audioId = extractPublicId(song.audio_url);
         if (audioId) await fetch('/api/deleteAudio', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ public_id: audioId })});
         
@@ -592,16 +612,28 @@ function App() {
           if (coverId) await fetch('/api/deleteImage', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ public_id: coverId })});
         }
         await supabase.from('songs').delete().eq('id', song.id);
+        
+        successfullyDeletedIds.push(song.id);
       }
-      setSongs(prev => prev.filter(s => !selectedIds.includes(s.id)));
+
+      setSongs(prev => prev.filter(s => !successfullyDeletedIds.includes(s.id)));
       setSelectedIds([]);
       setIsSelectionMode(false);
-      if (songsToDelete.find(s => s.id === currentSong?.id)) {
+      
+      if (songsToDelete.find(s => s.id === currentSong?.id && successfullyDeletedIds.includes(s.id))) {
         handleStop();
         setCurrentSong(null);
       }
+
+      if (!cancelUploadRef.current) {
+         showToast(`Deleted ${successfullyDeletedIds.length} songs successfully.`);
+      }
     } catch (err) { console.error("Deletion Error:", err); }
-    finally { setIsUploading(false); setUploadProgressText(''); }
+    finally { 
+      setIsUploading(false); 
+      setShowStopButton(false);
+      setUploadProgressText(''); 
+    }
   }
 
   const handleTimeUpdate = () => {
@@ -814,78 +846,123 @@ function App() {
     setActiveMenu(null);
   }
 
+  // FIXED BATCH UPLOAD FUNCTION
   const handleFileUpload = async (event) => {
     const files = Array.from(event.target.files);
     if (files.length === 0) return;
+    
     setIsUploading(true);
+    setShowStopButton(true);
+    cancelUploadRef.current = false;
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      setUploadProgressText(`Uploading ${i + 1} of ${files.length}...`);
+    const BATCH_SIZE = 3;
+    let processedCount = 0;
+    let i = 0;
 
-      await new Promise((resolve) => {
-        const objectURL = URL.createObjectURL(file);
-        const tempAudio = new Audio(objectURL);
-        
-        tempAudio.addEventListener('loadedmetadata', () => {
-          const mins = Math.floor(tempAudio.duration / 60);
-          const secs = Math.floor(tempAudio.duration % 60).toString().padStart(2, '0');
-          const durationStr = `${mins}:${secs}`;
-          URL.revokeObjectURL(objectURL);
+    // Use a while loop so we have absolute control over the iteration
+    while (i < files.length) {
+      // 1. The Ultimate Guard: Check before starting ANY new batch
+      if (cancelUploadRef.current) {
+        showToast(`Upload stopped. Saved ${processedCount} of ${files.length}.`);
+        break; 
+      }
 
-          jsmediatags.read(file, {
-            onSuccess: async function(tag) {
-              try {
-                const tags = tag.tags;
-                let coverUrl = '';
+      const chunk = files.slice(i, i + BATCH_SIZE);
+      setUploadProgressText(`Uploading ${i + 1}-${Math.min(i + BATCH_SIZE, files.length)} of ${files.length}...`);
 
-                if (tags.picture) {
-                  const byteArray = new Uint8Array(tags.picture.data);
-                  const blob = new Blob([byteArray], { type: tags.picture.format });
-                  const imgFormData = new FormData();
-                  imgFormData.append('file', blob);
-                  imgFormData.append('upload_preset', 'mMelody_preset');
-                  const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${credentials.cloudinaryName}/image/upload`, { method: 'POST', body: imgFormData });
-                  coverUrl = (await imgRes.json()).secure_url;
-                }
+      // We still process in parallel for speed, but wrap it tightly
+      await Promise.all(chunk.map(async (file) => {
+        // 2. The Mid-Flight Guard: Check before even creating the audio element
+        if (cancelUploadRef.current) return;
 
-                const audioFormData = new FormData();
-                audioFormData.append('file', file);
-                audioFormData.append('upload_preset', 'mMelody_preset');
-                const audioRes = await fetch(`https://api.cloudinary.com/v1_1/${credentials.cloudinaryName}/video/upload`, { method: 'POST', body: audioFormData });
-                const audioUrl = (await audioRes.json()).secure_url;
+        return new Promise((resolve) => {
+          const objectURL = URL.createObjectURL(file);
+          const tempAudio = new Audio(objectURL);
 
-                const newSong = {
-                  title: tags.title || file.name.replace('.mp3', ''),
-                  subtitle: extractTagText(tags.TIT3) || '',
-                  artist: tags.artist || '',
-                  album: tags.album || '',
-                  genre: tags.genre || '',
-                  release_year: tags.year || '',
-                  duration: durationStr,
-                  comment: extractTagText(tags.COMM) || '',
-                  composer: extractTagText(tags.TCOM) || '', 
-                  lyricist: extractTagText(tags.TEXT) || extractTagText(tags.TOLY) || '',
-                  lyrics: extractTagText(tags.USLT) || extractTagText(tags.SYLT) || '', 
-                  audio_url: audioUrl,
-                  cover_url: coverUrl,
-                  is_favorite: false,
-                  created_at: new Date().toISOString()
-                };
+          tempAudio.addEventListener('loadedmetadata', () => {
+            const mins = Math.floor(tempAudio.duration / 60);
+            const secs = Math.floor(tempAudio.duration % 60).toString().padStart(2, '0');
+            const durationStr = `${mins}:${secs}`;
+            URL.revokeObjectURL(objectURL);
 
-                const { data } = await supabase.from('songs').insert([newSong]).select();
-                if (data) setSongs(prev => [data[0], ...prev]);
-              } catch (err) { console.error("Upload error:", err); } 
-              finally { resolve(); }
-            },
-            onError: function() { resolve(); }
+            jsmediatags.read(file, {
+              onSuccess: async function(tag) {
+                try {
+                  // 3. The Pre-Network Guard: Check before expensive Cloudinary fetch
+                  if (cancelUploadRef.current) { resolve(); return; }
+
+                  const tags = tag.tags;
+                  let coverUrl = '';
+
+                  if (tags.picture) {
+                    const byteArray = new Uint8Array(tags.picture.data);
+                    const blob = new Blob([byteArray], { type: tags.picture.format });
+                    const imgFormData = new FormData();
+                    imgFormData.append('file', blob);
+                    imgFormData.append('upload_preset', 'mMelody_preset');
+                    const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${credentials.cloudinaryName}/image/upload`, { method: 'POST', body: imgFormData });
+                    coverUrl = (await imgRes.json()).secure_url;
+                  }
+                  
+                  // 4. The Post-Network Guard: Check before database insertion
+                  if (cancelUploadRef.current) { resolve(); return; }
+
+                  const audioFormData = new FormData();
+                  audioFormData.append('file', file);
+                  audioFormData.append('upload_preset', 'mMelody_preset');
+                  const audioRes = await fetch(`https://api.cloudinary.com/v1_1/${credentials.cloudinaryName}/video/upload`, { method: 'POST', body: audioFormData });
+                  const audioUrl = (await audioRes.json()).secure_url;
+
+                  const newSong = {
+                    title: tags.title || file.name.replace('.mp3', ''),
+                    subtitle: extractTagText(tags.TIT3) || '',
+                    artist: tags.artist || '',
+                    album: tags.album || '',
+                    genre: tags.genre || '',
+                    release_year: tags.year || '',
+                    duration: durationStr,
+                    comment: extractTagText(tags.COMM) || '',
+                    composer: extractTagText(tags.TCOM) || '', 
+                    lyricist: extractTagText(tags.TEXT) || extractTagText(tags.TOLY) || '',
+                    lyrics: extractTagText(tags.USLT) || extractTagText(tags.SYLT) || '', 
+                    audio_url: audioUrl,
+                    cover_url: coverUrl,
+                    is_favorite: false,
+                    created_at: new Date().toISOString()
+                  };
+
+                  // 5. The Absolute Final Check
+                  if (!cancelUploadRef.current) {
+                    const { data } = await supabase.from('songs').insert([newSong]).select();
+                    if (data) {
+                      setSongs(prev => [data[0], ...prev]);
+                      processedCount++;
+                    }
+                  }
+                } catch (err) { console.error("Upload error:", err); } 
+                finally { resolve(); }
+              },
+              onError: function() { resolve(); }
+            });
           });
+          
+          tempAudio.addEventListener('error', () => resolve());
         });
-      });
+      }));
+
+      // Only advance the loop index after the chunk has fully resolved
+      i += BATCH_SIZE;
     }
+
     setIsUploading(false);
+    setShowStopButton(false);
     setUploadProgressText('');
     
+    if (!cancelUploadRef.current) {
+       showToast(`${processedCount} songs processed successfully!`);
+    }
+    
+    cancelUploadRef.current = false; 
     if (fileInputRef.current) fileInputRef.current.value = null; 
   }
 
@@ -901,6 +978,19 @@ function App() {
   const filteredModalSongs = songs.filter(song =>
     (song.title && song.title.toLowerCase().includes(modalSearchTerm.toLowerCase())) ||
     (song.artist && song.artist.toLowerCase().includes(modalSearchTerm.toLowerCase()))
+  );
+
+  const currentSortOrder = currentPlaylist ? (playlistDetailSortOrders[currentPlaylist.id] || 'newest') : 'newest';
+  const sortedPlaylistDetailSongs = [...playlistSongs].sort((a, b) => {
+    if (currentSortOrder === 'az') return (a.title || '').localeCompare(b.title || '');
+    if (currentSortOrder === 'za') return (b.title || '').localeCompare(a.title || '');
+    if (currentSortOrder === 'oldest') return new Date(a.created_at) - new Date(b.created_at);
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
+
+  const filteredPlaylistSongs = sortedPlaylistDetailSongs.filter(song =>
+    (song.title && song.title.toLowerCase().includes(playlistSearchTerm.toLowerCase())) ||
+    (song.artist && song.artist.toLowerCase().includes(playlistSearchTerm.toLowerCase()))
   );
 
   const filteredPlaylists = sortedPlaylists.filter(pl => 
@@ -1028,6 +1118,7 @@ function App() {
           <audio 
             ref={audioRef} 
             src={currentSong?.audio_url || ''}
+            crossOrigin="anonymous"
             autoPlay={isPlaying}
             onEnded={handleNextSong} 
             onTimeUpdate={handleTimeUpdate}
@@ -1053,6 +1144,8 @@ function App() {
                     )}
                   </div>
                   
+                  <Visualizer audioRef={audioRef} isPlaying={isPlaying} />
+
                   <div className="scrolling-wrapper">
                     <div className="scrolling-text">
                       <span className="scroll-title">{currentSong.title || 'Unknown Title'}</span>
@@ -1335,6 +1428,7 @@ function App() {
                   <button className="back-btn" onClick={() => { 
                       const targetTab = currentPlaylist.isAlbum ? 'albums' : currentPlaylist.isArtist ? 'artists' : currentPlaylist.isGenre ? 'genres' : 'playlists';
                       setCurrentPlaylist(null); 
+                      setPlaylistSearchTerm(''); // Clear internal search on back
                       navigateTo(targetTab); 
                     }} style={{ padding: '5px 20px', color: '#56CCF2' }}>
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
@@ -1346,7 +1440,7 @@ function App() {
                       {currentPlaylist.isAuto && !currentPlaylist.isAlbum && !currentPlaylist.isArtist && !currentPlaylist.isGenre ? '❤️' : currentPlaylist.cover_url ? (
                         <img src={currentPlaylist.cover_url} alt="cover" className="playlist-list-img" />
                       ) : currentPlaylist.isArtist ? (
-                        <svg width="40%" height="40%" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
+                        <img src={defaultArtistImage} alt="artist cover" className="playlist-list-img" />
                       ) : '💽'}
                     </div>
                     <div className="pd-info">
@@ -1360,13 +1454,44 @@ function App() {
                       )}
                     </div>
                   </div>
+
+                  {playlistSongs.length > 0 && (
+                    <div style={{ padding: '10px 15px 0 15px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <span style={{ fontSize: '0.85rem', color: '#888', fontWeight: '600' }}>
+                          {playlistSearchTerm ? `${filteredPlaylistSongs.length} found` : `${playlistSongs.length} songs`}
+                        </span>
+                        <select className="sort-select" value={currentPlaylist ? (playlistDetailSortOrders[currentPlaylist.id] || 'newest') : 'newest'} onChange={(e) => setPlaylistDetailSortOrders(prev => ({ ...prev, [currentPlaylist.id]: e.target.value }))}>
+                          <option value="newest">Newest First</option>
+                          <option value="oldest">Oldest First</option>
+                          <option value="az">A-Z (Title)</option>
+                          <option value="za">Z-A (Title)</option>
+                        </select>
+                      </div>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type="text"
+                          placeholder="Search in this list..."
+                          className="search-bar animate-search"
+                          value={playlistSearchTerm}
+                          onChange={(e) => setPlaylistSearchTerm(e.target.value)}
+                          style={{ marginBottom: 0, paddingRight: '40px', width: '100%', boxSizing: 'border-box' }}
+                        />
+                        {playlistSearchTerm && (
+                          <button onClick={() => setPlaylistSearchTerm('')} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#888', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="song-list">
                   {playlistSongs.length === 0 ? (
                     <div className="empty-state"><h3>It's quiet here...</h3><p>Add some songs to this playlist!</p></div>
+                  ) : filteredPlaylistSongs.length === 0 ? (
+                    <div className="empty-state"><p>No songs match your search.</p></div>
                   ) : (
-                    playlistSongs.map((song, index) => {
+                    filteredPlaylistSongs.map((song, index) => {
                       const isThisPlaying = currentSong && currentSong.audio_url === song.audio_url;
                       const uniqueId = `pd-${song.id || index}`;
 
@@ -1548,7 +1673,7 @@ function App() {
                 {filteredAlbums.length === 0 ? (
                   <div className="empty-state"><p>No albums found.</p></div>
                 ) : (
-                  <div className="tag-grid" style={{ padding: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(85px, 1fr))', gap: '12px' }}>
+                  <div className="tag-grid" style={{ padding: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(95px, 1fr))', gap: '12px' }}>
                     {filteredAlbums.map((album, index) => (
                       <div key={`al-${index}`} style={{ display: 'flex', flexDirection: 'column', position: 'relative', background: 'rgba(255,255,255,0.03)', padding: '8px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
                         
@@ -1581,7 +1706,7 @@ function App() {
                               <svg width="50%" height="50%" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle><circle cx="12" cy="12" r="1"></circle></svg>
                             )}
                           </div>
-                          <div style={{ fontWeight: '600', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <div style={{ fontWeight: '600', fontSize: '0.75rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', width: '100%', textAlign: 'center', lineHeight: '1.2' }}>
                             {album.name}
                           </div>
                           <div style={{ fontSize: '0.65rem', color: '#888', marginTop: '2px' }}>
@@ -1626,7 +1751,7 @@ function App() {
                 {filteredArtists.length === 0 ? (
                   <div className="empty-state"><p>No artists found.</p></div>
                 ) : (
-                  <div className="tag-grid" style={{ padding: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '15px' }}>
+                  <div className="tag-grid" style={{ padding: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '15px' }}>
                     {filteredArtists.map((artist, index) => (
                       <div key={`ar-${index}`} style={{ display: 'flex', flexDirection: 'column', position: 'relative', alignItems: 'center', background: 'transparent', padding: '5px' }}>
                         
@@ -1656,10 +1781,10 @@ function App() {
                             ) : artist.cover_url ? (
                               <img src={artist.cover_url} alt={artist.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             ) : (
-                              <svg width="40%" height="40%" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
+                              <img src={defaultArtistImage} alt="default artist" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             )}
                           </div>
-                          <div style={{ fontWeight: '600', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>
+                          <div style={{ fontWeight: '600', fontSize: '0.75rem', display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden', width: '100%', textAlign: 'center', lineHeight: '1.2' }}>
                             {artist.name}
                           </div>
                           <div style={{ fontSize: '0.65rem', color: '#888', marginTop: '2px', textAlign: 'center' }}>
@@ -1705,7 +1830,7 @@ function App() {
                   <div className="tag-grid" style={{ padding: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '12px' }}>
                     {filteredGenres.map((genre, index) => (
                       <div key={`gn-${index}`} onClick={() => handleOpenGenre(genre)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'linear-gradient(135deg, rgba(86, 204, 242, 0.15), rgba(47, 128, 237, 0.15))', padding: '10px', borderRadius: '12px', border: '1px solid rgba(86, 204, 242, 0.3)', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', aspectRatio: '1/1', textAlign: 'center' }}>
-                        <div style={{ fontWeight: '700', fontSize: '0.95rem', color: '#fff', marginBottom: '6px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#fff', marginBottom: '6px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                           {genre.name}
                         </div>
                         <div style={{ fontSize: '0.7rem', color: '#56CCF2' }}>
@@ -1977,7 +2102,7 @@ function App() {
               {activeMenu === 'footer-menu' && (
                 <div className="dropdown-menu" style={{ ...getDropdownStyle(), right: '10px', bottom: '60px', left: 'auto', top: 'auto', minWidth: '160px', padding: '10px 0', transform: 'none' }}>
                   
-                  {/* NEW: Dedicated Cloud Sync Button! */}
+                  {/* Dedicated Cloud Sync Button! */}
                   <div className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 15px' }} onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleRefreshData(); }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#56CCF2" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="23 4 23 10 17 10"></polyline>
