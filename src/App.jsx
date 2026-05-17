@@ -1188,33 +1188,39 @@ function App() {
                       <h2>mMelody</h2>
                   </div>
                   
-                  <div className="upload-container">
-                    <button className="upload-btn" onClick={() => fileInputRef.current.click()} disabled={isUploading}>
-                      {isUploading ? `⏳ ${uploadProgressText}` : 'Upload Music'}
-                    </button>
+                  <div className="upload-container" style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                    {!isUploading ? (
+                      <button className="upload-btn" onClick={() => fileInputRef.current.click()}>
+                        Upload Music
+                      </button>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.05)', padding: '5px 15px', borderRadius: '25px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <span className="spinner-mini">⏳</span>
+                        <span style={{ fontSize: '0.8rem', color: '#ccc' }}>{uploadProgressText}</span>
+                        <button 
+                          onClick={() => setCancelUpload(true)} 
+                          style={{ background: '#ff4d4d', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: '15px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}
+                        >
+                          STOP
+                        </button>
+                      </div>
+                    )}
                     <input type="file" accept="audio/mpeg, audio/mp3" multiple ref={fileInputRef} onChange={handleFileUpload} style={{ display: 'none' }} />
                   </div>
 
                   <div className="selection-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 999 }}>
-                    <button className="action-icon-btn" onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }}>
-                      {isSelectionMode ? 'Cancel' : 'Select'}
-                    </button>
-                    
-                    {!isSelectionMode ? (
-                      <select className="sort-select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
-                        <option value="newest">Newest First</option>
-                        <option value="oldest">Oldest First</option>
-                        <option value="az">A-Z (Title)</option>
-                        <option value="za">Z-A (Title)</option>
-                      </select>
-                    ) : (
-                      selectedIds.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <button className="action-icon-btn" onClick={() => { setIsSelectionMode(!isSelectionMode); setSelectedIds([]); }}>
+                        {isSelectionMode ? 'Cancel' : 'Select'}
+                      </button>
+                      
+                      {isSelectionMode && selectedIds.length > 0 && (
                         <div className="menu-container" style={{ position: 'relative' }}>
                           <button className="action-icon-btn" style={{ background: 'rgba(86, 204, 242, 0.15)', color: '#56CCF2', border: '1px solid rgba(86, 204, 242, 0.4)', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }} onClick={(e) => toggleMenu(e, 'bulk-actions')}>
                             Actions ({selectedIds.length}) <span style={{ fontSize: '0.8rem' }}>▼</span>
                           </button>
                           {activeMenu === 'bulk-actions' && (
-                            <div className="dropdown-menu" style={{ ...getDropdownStyle(), position: 'absolute', right: 0, left: 'auto', transform: 'none', top: '100%', marginTop: '8px', zIndex: 999999 }}>
+                            <div className="dropdown-menu" style={{ ...getDropdownStyle(), position: 'absolute', right: 'auto', left: 0, transform: 'none', top: '100%', marginTop: '8px', zIndex: 999999 }}>
                               <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleOpenBulkPlaylistModal(); }}>
                                 💽 Add to Playlist
                               </div>
@@ -1224,7 +1230,16 @@ function App() {
                             </div>
                           )}
                         </div>
-                      )
+                      )}
+                    </div>
+                    
+                    {!isSelectionMode && (
+                      <select className="sort-select" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="az">A-Z (Title)</option>
+                        <option value="za">Z-A (Title)</option>
+                      </select>
                     )}
                   </div>
 
