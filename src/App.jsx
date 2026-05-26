@@ -1,3 +1,4 @@
+import { useUser } from './hooks/useUser';
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabaseClient'
 import jsmediatags from 'jsmediatags/dist/jsmediatags.min.js'
@@ -5,6 +6,7 @@ import './App.css'
 import logoImage from './logo.png'
 import defaultArtistImage from './Mic-Default.jpg'
 import { MediaSession } from '@capgo/capacitor-media-session';
+import Visualizer from './Visualizer';
 
 const extractTagText = (frame) => {
   if (!frame) return '';
@@ -29,7 +31,9 @@ const extractPublicId = (url) => {
   } catch (e) { return null; }
 };
 
+
 function App() {
+  const { user } = useUser();
   const [credentials, setCredentials] = useState({
     supabaseUrl: localStorage.getItem('supabaseUrl') || '',
     supabaseAnonKey: localStorage.getItem('supabaseAnonKey') || '',
@@ -45,8 +49,68 @@ function App() {
 
   const [currentSong, setCurrentSong] = useState(null)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
+  const EQ_PRESETS = {
+    'Flat': [0,0,0,0,0,0,0,0,0,0],
+    'Bass': [6,5,4,2,0,0,0,0,0,0],
+    'Treble': [0,0,0,0,0,0,2,4,5,6],
+    'Bass and Treble': [5,4,2,0,0,0,0,2,4,5],
+    'Classic': [0,0,0,0,0,0,0,-2,-4,-6],
+    'Dance': [4,3,2,0,0,-2,-4,-4,-4,-4],
+    'Pop': [-2,-1,0,2,4,4,2,0,-1,-2],
+    'Live': [-2,0,1,2,2,2,1,0,-1,-2],
+    'Rock': [5,4,3,1,-1,-1,1,3,4,5],
+    'Metal': [6,5,4,0,-2,-2,0,4,5,6],
+    'Techno': [5,4,2,0,-2,-4,-2,0,2,4],
+    'Soft': [1,1,0,0,0,0,0,0,1,1],
+    'Country': [0,0,0,2,4,4,2,0,0,0]
+  };
+
+  const [volume, setVolume] = useState(1);
+  const [isNormalized, setIsNormalized] = useState(false);
+  const [showVolumePopup, setShowVolumePopup] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [showStopButton, setShowStopButton] = useState(false);
+
+  /* CRITICAL FIX: These missing state variables caused the blank screen crash! */
+  const [showEqModal, setShowEqModal] = useState(false);
+
+  // --- EQ STATES ---
+  /* NEW: Custom Presets & Save Prompt States */
+  const [customPresets, setCustomPresets] = useState(() => JSON.parse(localStorage.getItem('mmelody_custom_presets')) || {});
+  const [showSavePresetPrompt, setShowSavePresetPrompt] = useState(false);
+  const [newPresetName, setNewPresetName] = useState('');
+  
+  /* Merge Defaults with User Saved Presets */
+  const ALL_PRESETS = { ...EQ_PRESETS, ...customPresets };
+
+  const [eqPreset, setEqPreset] = useState(() => localStorage.getItem('mmelody_eq_preset') || 'Flat');
+  const [eqBands, setEqBands] = useState(() => {
+    const saved = localStorage.getItem('mmelody_eq_bands');
+    return saved ? JSON.parse(saved) : EQ_PRESETS['Flat'];
+  });
+
+  const applyAudioEffects = () => {
+    if (!audioRef.current || !audioRef.current._customEqBands) return;
+    const ctx = audioRef.current._customAudioCtx;
+    
+    // Apply 10-band EQ
+    audioRef.current._customEqBands.forEach((band, i) => {
+        band.gain.setTargetAtTime(eqBands[i], ctx.currentTime, 0.1);
+    });
+  };
+
+  useEffect(() => {
+    applyAudioEffects();
+    localStorage.setItem('mmelody_eq_bands', JSON.stringify(eqBands));
+    localStorage.setItem('mmelody_eq_preset', eqPreset);
+  }, [eqBands, eqPreset]);
+
+  // Boot the EQ automatically when the visualizer graph connects
+  useEffect(() => {
+    const handleGraphReady = () => applyAudioEffects();
+    window.addEventListener('audioGraphReady', handleGraphReady);
+    return () => window.removeEventListener('audioGraphReady', handleGraphReady);
+  }, [eqBands]);
   const cancelUploadRef = useRef(false);
   const [isShuffle, setIsShuffle] = useState(false);
   
@@ -647,6 +711,14 @@ function App() {
     }
   }
 
+  const handleVolumeChange = (e) => {
+    const newVol = parseFloat(e.target.value);
+    setVolume(newVol);
+    if (audioRef.current) {
+      audioRef.current.volume = newVol; 
+    }
+  };
+
   const handleStop = (e) => {
     if (e) e.stopPropagation();
     if (audioRef.current) {
@@ -785,10 +857,15 @@ function App() {
   }
 
   const handleOpenInfo = () => {
-    setShowMoreDetails(true);
-    setTimeout(() => {
-      moreDetailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
+    if (showMoreDetails) {
+      setShowMoreDetails(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' }); // Smoothly returns you to the top
+    } else {
+      setShowMoreDetails(true);
+      setTimeout(() => {
+        moreDetailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
   }
 
   const toggleMenu = (e, id) => {
@@ -927,7 +1004,10 @@ function App() {
                     audio_url: audioUrl,
                     cover_url: coverUrl,
                     is_favorite: false,
+                    user_id: user?.id || null, // This safely captures the ID
                     created_at: new Date().toISOString()
+                    // ADD THIS LINE BELOW:
+                    
                   };
 
                   // 5. The Absolute Final Check
@@ -1115,11 +1195,13 @@ function App() {
       {isConfigured && (
         <> 
           <audio 
-            ref={audioRef} 
-            src={currentSong?.audio_url || ''}
+            ref={audioRef}
+            /* CRITICAL MOBILE FIX: Appending '?cors=true' forces the WebView to bypass its strict local cache and pull the secure headers needed for the visualizer */ 
+            src={currentSong?.audio_url ? `${currentSong.audio_url}?cors=true` : ''}
             autoPlay={isPlaying}
             onEnded={handleNextSong} 
             onTimeUpdate={handleTimeUpdate}
+            crossOrigin="anonymous"
           />
           {activeMenu && (
             <div className="menu-backdrop" onClick={(e) => { e.stopPropagation(); setActiveMenu(null); }}></div>
@@ -1129,138 +1211,266 @@ function App() {
             {/* DETAIL VIEW */}
             {activeTab === 'detail' && (
               currentSong ? (
-                <div className="detail-view-container">
-                  <button className="back-btn" onClick={() => navigateTo('list')}>
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-                  </button>
-
-                  <div className="detail-art-container">
-                    {currentSong.cover_url ? (
-                      <img src={currentSong.cover_url} alt="cover" className="detail-art" />
-                    ) : (
-                      <div className="detail-art placeholder-large">🎵</div>
-                    )}
-                  </div>
+                <div className="detail-view-container" style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  justifyContent: 'flex-start', 
+                  height: 'calc(100vh - 65px)', /* Keeps the scrollable area perfectly bounded above the bottom nav */
+                  overflowY: 'auto', /* CRITICAL FIX: 'auto' prevents the container from EVER slicing the bottom UI */
+                  overflowX: 'hidden',
+                  padding: '20px 20px 40px 20px', /* Generous bottom padding so the button clears the absolute edge */
+                  boxSizing: 'border-box'
+                }}>
                   
-                  <div className="scrolling-wrapper">
-                    <div className="scrolling-text">
-                      <span className="scroll-title">{currentSong.title || 'Unknown Title'}</span>
-                      {currentSong.artist && <span className="scroll-artist"> • {currentSong.artist}</span>}
-                    </div>
-                  </div>
-
-                  <div style={{ textAlign: 'center', color: '#888', fontSize: '0.85rem', marginTop: '-5px', marginBottom: '15px', fontWeight: '500', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#56CCF2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-                    Playing from {playingFrom}
-                  </div>
-
-                  <div className="detail-interaction-row">
-                    <button className={`detail-inter-btn ${isShuffle ? 'active-info' : ''}`} onClick={() => setIsShuffle(!isShuffle)} title="Toggle Shuffle">
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="16 3 21 3 21 8"></polyline>
-                        <line x1="4" y1="20" x2="21" y2="3"></line>
-                        <polyline points="21 16 21 21 16 21"></polyline>
-                        <line x1="15" y1="15" x2="21" y2="21"></line>
-                        <line x1="4" y1="4" x2="9" y2="9"></line>
-                      </svg>
-                    </button>
-
-                    <button className={`detail-inter-btn ${currentSong.is_favorite ? 'favorite-filled' : ''}`} onClick={() => handleToggleFavorite(currentSong)}>
-                      <svg width="28" height="28" viewBox="0 0 24 24" fill={currentSong.is_favorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-                    </button>
-
-                    <button className="detail-inter-btn" onClick={() => handleOpenPlaylistModal(currentSong)}>
-                      <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zM2 16h8v-2H2v2zm14-1v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4z"/>
-                      </svg>
-                    </button>
-
-                    <button className="detail-inter-btn" onClick={() => { navigateTo('queue'); setShowMoreDetails(false); }} title="View Queue">
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="4" y1="6" x2="20" y2="6"></line>
-                        <line x1="4" y1="12" x2="20" y2="12"></line>
-                        <line x1="4" y1="18" x2="11" y2="18"></line>
-                        <polyline points="15 15 18 18 15 21"></polyline>
-                        <line x1="11" y1="18" x2="18" y2="18"></line>
-                      </svg>
-                    </button>
+                  {/* --- TOP SECTION --- */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', marginBottom: '15px' }}>
                     
-                    <button className={`detail-inter-btn ${showMoreDetails ? 'active-info' : ''}`} onClick={handleOpenInfo}>
-                      <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-                      </svg>
-                    </button>
-                  </div>
-                  
-                  <div className="detail-progress-container">
-                    <div className="progress-bar-bg" style={{ position: 'relative' }}>
-                      <div className="progress-bar-fill" style={{ width: `${progress}%` }}></div>
-                      <input 
-                        type="range" 
-                        min="0" 
-                        max="100" 
-                        step="0.1"
-                        value={progress || 0} 
-                        onChange={handleSeek}
-                        className="progress-scrubber"
-                      />
+                    {/* NEW: Dedicated Header Row for Back Button (Matches Reference 2) */}
+                    <div style={{ width: '100%', display: 'flex', alignItems: 'center', marginBottom: '15px' }}>
+                      <button className="back-btn" onClick={() => navigateTo('list')} style={{ padding: 0, margin: 0, background: 'transparent', border: 'none', color: '#56CCF2', display: 'flex', alignItems: 'center', fontWeight: '700', fontSize: '1.1rem' }}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                        <span style={{ marginLeft: '6px' }}>Back</span>
+                      </button>
                     </div>
-                    <div className="time-row">
-                      <span>{currentTimeFormatted}</span>
-                      <span>{currentSong.duration || '0:00'}</span>
-                    </div>
-                  </div>
 
-                  <div className="detail-playback-controls-bar">
-                    <button className="pro-ctrl-btn" onClick={handleSeekBackward}>
-                      <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/>
-                      </svg>
-                    </button>
-                    <button className="pro-ctrl-btn" onClick={handlePreviousSong}><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
-                    <button className="pro-ctrl-btn master-play-pause-btn" onClick={() => handlePlayPause(currentSong)}>
-                      {isPlaying ? (
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+                    <div style={{ 
+                      width: '100%', 
+                      maxWidth: '350px', 
+                      aspectRatio: '1/1', 
+                      borderRadius: '12px', 
+                      boxShadow: '0 8px 30px rgba(0,0,0,0.5)', 
+                      overflow: 'hidden',
+                      backgroundColor: 'transparent'
+                      /* Removed the massive marginTop to let it sit flush beneath the back button */
+                    }}>
+                      {currentSong.cover_url ? (
+                        <img src={currentSong.cover_url} alt="cover" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                       ) : (
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
+                        <div style={{ display: 'flex', width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', fontSize: '4rem', background: '#1a1a1a' }}>🎵</div>
                       )}
-                    </button>
-                    <button className="pro-ctrl-btn master-stop-btn" onClick={handleStop}>
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-                    </button>
-                    <button className="pro-ctrl-btn" onClick={handleNextSong}><svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6zm10-12h2v12h-2z"/></svg></button>
-                    <button className="pro-ctrl-btn" onClick={handleSeekForward}>
-                      <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6-8.5-6z"/>
-                      </svg>
-                    </button>
+                    </div>
+
+                    {/* --- TRUE SYNC VISUALIZER PLACEMENT --- */}
+                    <Visualizer audioRef={audioRef} isPlaying={isPlaying} isNormalized={isNormalized} />
+
                   </div>
 
-                  <div className="more-details-wrapper" ref={moreDetailsRef}>
-                    <button className="more-details-btn" onClick={() => setShowMoreDetails(!showMoreDetails)}>
-                      {showMoreDetails ? 'Hide Details' : 'More Details'}
-                    </button>
-                    {showMoreDetails && (
-                      <div className="more-details-content">
-                        <div className="tag-grid">
-                          <div className="tag-item"><span>Title:</span> {currentSong.title || 'Unknown'}</div>
-                          <div className="tag-item"><span>Artist:</span> {currentSong.artist || 'Unknown'}</div>
-                          <div className="tag-item"><span>Subtitle:</span> {currentSong.subtitle || 'Unknown'}</div>
-                          <div className="tag-item"><span>Album:</span> {currentSong.album || 'Unknown'}</div>
-                          <div className="tag-item"><span>Year:</span> {currentSong.release_year || 'Unknown'}</div>
-                          <div className="tag-item"><span>Composer:</span> {currentSong.composer || 'Unknown'}</div>
-                          <div className="tag-item"><span>Lyricist:</span> {currentSong.lyricist || 'Unknown'}</div>
-                          <div className="tag-item"><span>Genre:</span> {currentSong.genre || 'Unknown'}</div>
-                          <div className="tag-item"><span>Comment:</span> {currentSong.comment || 'None'}</div>
-                        </div>
-                        {currentSong.lyrics ? (
-                          <div className="lyrics-box"><h4>Lyrics</h4><p>{currentSong.lyrics}</p></div>
-                        ) : (
-                          <div className="lyrics-box"><p style={{color: '#888', fontStyle: 'italic'}}>Lyrics not available.</p></div>
-                        )}
+                  {/* --- BOTTOM SECTION (Compressed UI Stack) --- */}
+                  <div style={{ display: 'flex', flexDirection: 'column', width: '100%', flexShrink: 0, paddingBottom: '15px' }}>
+                    
+                    <div className="scrolling-wrapper" style={{ margin: '10px 0 5px 0' }}>
+                      <div className="scrolling-text">
+                        <span className="scroll-title" style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>{currentSong.title || 'Unknown Title'}</span>
+                        {currentSong.artist && <span className="scroll-artist" style={{ fontSize: '0.9rem', color: '#56CCF2' }}> • {currentSong.artist}</span>}
                       </div>
-                    )}
+                    </div>
+
+                    <div style={{ textAlign: 'center', color: '#888', fontSize: '0.75rem', marginBottom: '8px', fontWeight: '500', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#56CCF2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                      Playing from {playingFrom}
+                    </div>
+
+                    {/* CRITICAL FIX: Changed from 'space-around' to centered flex with a precise gap to equally space all buttons! */}
+                    {/* CRITICAL FIX: Removed absolute positioning and restored 'space-evenly' to distribute all 5 buttons perfectly across the screen! */}
+                    {/* CRITICAL FIX: Changed to 'space-between' and added 1px padding to perfectly match the progress bar edges! */}
+                    <div className="detail-interaction-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '10px', padding: '0 1px', boxSizing: 'border-box' }}>
+                      <button className={`detail-inter-btn ${isShuffle ? 'active-info' : ''}`} onClick={() => setIsShuffle(!isShuffle)} style={{ background: 'transparent', border: 'none', color: isShuffle ? '#56CCF2' : '#888', padding: 0 }}>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line>
+                        </svg>
+                      </button>
+
+                      <button className={`detail-inter-btn`} onClick={() => handleToggleFavorite(currentSong)} style={{ background: 'transparent', border: 'none', color: currentSong.is_favorite ? '#E0245E' : '#888', padding: 0 }}>
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill={currentSong.is_favorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                      </button>
+
+                      <button className="detail-inter-btn" onClick={() => handleOpenPlaylistModal(currentSong)} style={{ background: 'transparent', border: 'none', color: '#888', padding: 0 }}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zM2 16h8v-2H2v2zm14-1v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4z"/></svg>
+                      </button>
+
+                      <button className="detail-inter-btn" onClick={() => { navigateTo('queue'); setShowMoreDetails(false); }} style={{ background: 'transparent', border: 'none', color: '#888', padding: 0 }}>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="11" y2="18"></line><polyline points="15 15 18 18 15 21"></polyline><line x1="11" y1="18" x2="18" y2="18"></line>
+                        </svg>
+                      </button>
+                      
+                      <button className={`detail-inter-btn ${showMoreDetails ? 'active-info' : ''}`} onClick={handleOpenInfo} style={{ background: 'transparent', border: 'none', color: showMoreDetails ? '#56CCF2' : '#888', padding: 0 }}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                        </svg>
+                      </button>
+                    </div>
+                    
+                    {/* CRITICAL FIX: The Gaps reduced */}
+                    <div className="detail-progress-container" style={{ marginBottom: '5px', marginTop: '-5px' }}>
+                      <div className="progress-bar-bg" style={{ position: 'relative' }}>
+                        <div className="progress-bar-fill" style={{ width: `${progress}%` }}></div>
+                        <input type="range" min="0" max="100" step="0.1" value={progress || 0} onChange={handleSeek} className="progress-scrubber" />
+                      </div>
+                      <div className="time-row" style={{ marginTop: '4px', fontSize: '0.7rem' }}>
+                        <span>{currentTimeFormatted}</span>
+                        <span>{currentSong.duration || '0:00'}</span>
+                      </div>
+                    </div>
+
+                    {/* --- MAIN PLAYBACK CONTROLS (8-BUTTON LAYOUT) --- */}
+                    <div className="detail-playback-controls-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 5px', margin: '15px 0 5px 0' }}>
+                      
+                      {/* 1. VOLUME BUTTON & SLIM VERTICAL POPOVER (Small Icon - 18px) */}
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {showVolumePopup && (
+                          <>
+                            {/* Invisible backdrop to close the popup when clicking anywhere else */}
+                            <div 
+                              style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 90 }} 
+                              onClick={(e) => { e.stopPropagation(); setShowVolumePopup(false); }}
+                            />
+                            
+                            {/* The Slim, Pill-Shaped Volume Slider Panel */}
+                            <div className="volume-popover" style={{
+                              position: 'absolute', bottom: '150%', left: '50%', transform: 'translateX(-50%)',
+                              width: '40px', /* CRITICAL FIX: Locked thin width to hug the button tightly */
+                              background: 'rgba(20, 20, 20, 0.95)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '25px',
+                              padding: '12px 0', /* CRITICAL FIX: Removed side padding to kill the thickness */
+                              display: 'flex', flexDirection: 'column', alignItems: 'center',
+                              gap: '15px', zIndex: 100, boxShadow: '0 10px 30px rgba(0,0,0,0.8)',
+                              backdropFilter: 'blur(15px)'
+                            }}>
+                              {/* Sleek Normalizer Icon Button (Fixed Circular Size) */}
+                              <button 
+                                onClick={() => setIsNormalized(!isNormalized)}
+                                title="Volume Normalizer"
+                                style={{ 
+                                  width: '30px', height: '30px', /* Fixed small circular size */
+                                  borderRadius: '50%', cursor: 'pointer', transition: 'all 0.2s',
+                                  background: isNormalized ? 'rgba(86, 204, 242, 0.15)' : 'rgba(255,255,255,0.05)', 
+                                  color: isNormalized ? '#56CCF2' : '#888', 
+                                  border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
+                                }}
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M7 9H4v6h3l4 4V5L7 9z"></path>
+                                  <path d="M14 12h1l2-4 2 8 2-4h1"></path>
+                                </svg>
+                              </button>
+                              
+                              {/* Thinner, Modern Slider Track */}
+                              <div style={{ height: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', paddingBottom: '5px' }}>
+                                <input 
+                                  type="range" min="0" max="1" step="0.01" value={volume} onChange={handleVolumeChange} 
+                                  style={{ 
+                                    transform: 'rotate(-90deg)', 
+                                    width: '100px', 
+                                    height: '4px', /* Thin liner bar */
+                                    background: 'rgba(255, 255, 255, 0.2)',
+                                    borderRadius: '2px',
+                                    outline: 'none',
+                                    margin: 0, 
+                                    cursor: 'pointer', 
+                                    accentColor: '#56CCF2' /* Sharper slider theme color */
+                                  }} 
+                                />
+                              </div>
+                            </div>
+                          </>
+                        )}
+                        
+                        <button className="pro-ctrl-btn" onClick={() => setShowVolumePopup(!showVolumePopup)} style={{ background: 'transparent', border: 'none', color: volume === 0 ? '#ff4d4d' : '#888', padding: 0 }}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            {volume === 0 ? (
+                               <><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></>
+                            ) : (
+                               <><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></>
+                            )}
+                          </svg>
+                        </button>
+                      </div>
+
+                      {/* 2. PREVIOUS TRACK (24px) */}
+                      <button className="pro-ctrl-btn" onClick={handlePreviousSong} style={{ background: 'transparent', border: 'none', color: '#fff', padding: 0 }}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                      </button>
+
+                      {/* 3. SEEK BACKWARD (24px) */}
+                      <button className="pro-ctrl-btn" onClick={handleSeekBackward} style={{ background: 'transparent', border: 'none', color: '#fff', padding: 0 }}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg>
+                      </button>
+
+                      {/* 4. PLAY / PAUSE (24px - Scaling removed to match) */}
+                      <button className="pro-ctrl-btn master-play-pause-btn" onClick={() => handlePlayPause(currentSong)} style={{ background: 'transparent', color: '#56CCF2', padding: 0, border: 'none' }}>
+                        {isPlaying ? (
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+                        ) : (
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>
+                        )}
+                      </button>
+
+                      {/* 5. STOP (24px) */}
+                      <button className="pro-ctrl-btn master-stop-btn" onClick={handleStop} style={{ background: 'transparent', color: '#ff4d4d', padding: 0, border: 'none' }}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                      </button>
+
+                      {/* 6. SEEK FORWARD (24px) */}
+                      <button className="pro-ctrl-btn" onClick={handleSeekForward} style={{ background: 'transparent', border: 'none', color: '#fff', padding: 0 }}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6-8.5-6z"/></svg>
+                      </button>
+
+                      {/* 7. NEXT TRACK (24px) */}
+                      <button className="pro-ctrl-btn" onClick={handleNextSong} style={{ background: 'transparent', border: 'none', color: '#fff', padding: 0 }}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6zm10-12h2v12h-2z"/></svg>
+                      </button>
+
+                      {/* 8. EQUALIZER BUTTON (Triggers EQ Pop-up) */}
+                      <button className="pro-ctrl-btn" onClick={() => setShowEqModal(true)} style={{ background: 'transparent', border: 'none', color: '#888', padding: 0 }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line>
+                        </svg>
+                      </button>
+                    </div>
+
+                    <div className="more-details-wrapper" ref={moreDetailsRef} style={{ borderTop: 'none', paddingTop: '0', paddingBottom: '15px', textAlign: 'center', overflow: 'visible', flexShrink: 0 }}>
+                      <button 
+                        onClick={handleOpenInfo} 
+                        style={{ 
+                          display: 'inline-block', padding: '6px 18px', fontSize: '0.65rem', fontWeight: '700', 
+                          letterSpacing: '1px', textTransform: 'uppercase', cursor: 'pointer',
+                          color: showMoreDetails ? '#ffffff' : '#888', 
+                          backgroundColor: showMoreDetails ? '#56CCF2' : 'transparent', 
+                          backgroundImage: 'none', 
+                          border: `1px solid ${showMoreDetails ? '#56CCF2' : '#888'}`, 
+                          borderRadius: '20px', 
+                          margin: '0 auto 5px auto', /* CRITICAL FIX: Pushes the button up away from the clip boundary */
+                          transition: 'all 0.2s ease',
+                          boxShadow: 'none',
+                          boxSizing: 'border-box' /* Prevents the border from overflowing the element's height */
+                        }}
+                      >
+                        {showMoreDetails ? 'Hide Details' : 'More Details'}
+                      </button>
+                      
+                      {showMoreDetails && (
+                        <div className="more-details-content" style={{ marginTop: '15px' }}>
+                          <div className="tag-grid">
+                            <div className="tag-item"><span>Title:</span> {currentSong.title || 'Unknown'}</div>
+                            <div className="tag-item"><span>Artist:</span> {currentSong.artist || 'Unknown'}</div>
+                            <div className="tag-item"><span>Subtitle:</span> {currentSong.subtitle || 'Unknown'}</div>
+                            <div className="tag-item"><span>Album:</span> {currentSong.album || 'Unknown'}</div>
+                            <div className="tag-item"><span>Year:</span> {currentSong.release_year || 'Unknown'}</div>
+                            <div className="tag-item"><span>Composer:</span> {currentSong.composer || 'Unknown'}</div>
+                            <div className="tag-item"><span>Lyricist:</span> {currentSong.lyricist || 'Unknown'}</div>
+                            <div className="tag-item"><span>Genre:</span> {currentSong.genre || 'Unknown'}</div>
+                            <div className="tag-item"><span>Comment:</span> {currentSong.comment || 'None'}</div>
+                          </div>
+                          {currentSong.lyrics ? (
+                            <div className="lyrics-box" style={{ textAlign: 'left' }}><h4>Lyrics</h4><p style={{ whiteSpace: 'pre-wrap' }}>{currentSong.lyrics}</p></div>
+                          ) : (
+                            <div className="lyrics-box"><p style={{color: '#888', fontStyle: 'italic'}}>Lyrics not available.</p></div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
+
                 </div>
               ) : (
                 <div className="empty-state"><h3>No song selected</h3><p>Play a song from the list view to see details.</p></div>
@@ -2042,6 +2252,111 @@ function App() {
               </div>
             </div>
           )}
+
+          {/* EQUALIZER MODAL POP-UP */}
+            {showEqModal && (
+              <div className="modal-overlay" style={{ backgroundColor: 'rgba(0, 0, 0, 0.75)', zIndex: 99999, backdropFilter: 'blur(12px)' }} onClick={() => setShowEqModal(false)}>
+                <div className="modal-content" style={{ display: 'flex', flexDirection: 'column', height: '85vh', maxHeight: '650px', width: '92%', maxWidth: '400px', padding: 0, overflow: 'hidden', borderRadius: '24px', background: '#0a0a0a', border: '1px solid rgba(255, 255, 255, 0.1)', boxShadow: '0 20px 50px rgba(0,0,0,0.8)' }} onClick={e => e.stopPropagation()}>
+                  
+                  <div className="modal-header" style={{ padding: '15px 20px', borderBottom: '1px solid #222', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h3 style={{ margin: 0 }}>Equalizer</h3>
+                    <button onClick={() => setShowEqModal(false)} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#56CCF2" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                  </div>
+                  
+                  <div style={{ padding: '15px 20px 0', display: 'flex', justifyContent: 'flex-start', alignItems: 'center', flexShrink: 0, position: 'relative' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      <select 
+                        value={eqPreset} 
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEqPreset(val);
+                          if (val !== 'Custom') setEqBands(ALL_PRESETS[val]);
+                        }}
+                        style={{ background: '#111', border: '1px solid #444', borderRadius: '20px', padding: '6px 15px', color: '#fff', fontSize: '0.8rem', outline: 'none', cursor: 'pointer' }}
+                      >
+                        <option value="Custom" style={{ background: '#1a1a1a', color: '#fff' }}>Custom</option>
+                        {Object.keys(ALL_PRESETS).map(key => <option key={key} value={key} style={{ background: '#1a1a1a', color: '#fff' }}>{key}</option>)}
+                      </select>
+
+                      {/* NEW: Save Preset Button (Floppy Disk) */}
+                      {eqPreset === 'Custom' && (
+                        <button onClick={() => setShowSavePresetPrompt(!showSavePresetPrompt)} style={{ background: 'transparent', border: '1px solid #56CCF2', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#56CCF2', cursor: 'pointer', transition: '0.2s' }}>
+                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                        </button>
+                      )}
+
+                      {/* DELETE PRESET BUTTON: Only shows for user-saved custom presets */}
+                      {Object.keys(customPresets).includes(eqPreset) && (
+                        <button onClick={() => {
+                          if(window.confirm(`Delete the "${eqPreset}" preset?`)) {
+                            const updatedPresets = { ...customPresets };
+                            delete updatedPresets[eqPreset];
+                            setCustomPresets(updatedPresets);
+                            localStorage.setItem('mmelody_custom_presets', JSON.stringify(updatedPresets));
+                            setEqPreset('Flat');
+                            setEqBands(EQ_PRESETS['Flat']);
+                          }
+                        }} style={{ background: 'transparent', border: '1px solid #ff4d4d', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ff4d4d', cursor: 'pointer', transition: '0.2s', padding: 0 }} title="Delete Preset">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* NEW: Inline Save Prompt Box */}
+                    {showSavePresetPrompt && (
+                      <div style={{ position: 'absolute', top: '55px', left: '20px', background: '#1a1a1a', border: '1px solid #333', borderRadius: '12px', padding: '15px', zIndex: 100000, display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: '0 15px 35px rgba(0,0,0,0.9)' }}>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#fff' }}>Enter Custom Preset Name</span>
+                        <input 
+                          type="text" 
+                          value={newPresetName} 
+                          onChange={e => setNewPresetName(e.target.value)} 
+                          placeholder="My Preset" 
+                          style={{ background: '#0a0a0a', border: '1px solid #444', color: '#56CCF2', padding: '8px 12px', borderRadius: '8px', fontSize: '0.85rem', outline: 'none' }} 
+                          autoFocus 
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                          <button onClick={() => { setShowSavePresetPrompt(false); setNewPresetName(''); }} style={{ background: 'transparent', border: '1px solid #555', color: '#aaa', padding: '6px 16px', borderRadius: '20px', fontSize: '0.75rem', cursor: 'pointer' }}>Cancel</button>
+                          <button onClick={() => {
+                            if(!newPresetName.trim()) return;
+                            const safeName = newPresetName.trim();
+                            const updatedPresets = { ...customPresets, [safeName]: eqBands };
+                            setCustomPresets(updatedPresets);
+                            localStorage.setItem('mmelody_custom_presets', JSON.stringify(updatedPresets));
+                            setEqPreset(safeName);
+                            setShowSavePresetPrompt(false);
+                            setNewPresetName('');
+                          }} style={{ background: '#56CCF2', border: 'none', color: '#000', padding: '6px 16px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer' }}>Save</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 15px', flexGrow: 1, alignItems: 'center', minHeight: '280px' }}>
+                    {[31.5, 63, 125, 250, 500, '1 k', '2 k', '4 k', '8 k', '16 k'].map((freq, i) => (
+                      <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '10%' }}>
+                        <span style={{ fontSize: '0.55rem', color: '#aaa', marginBottom: '2px', textAlign: 'center' }}>{freq}</span>
+                        <span style={{ fontSize: '0.55rem', color: '#fff', marginBottom: '15px' }}>{eqBands[i] > 0 ? `+${eqBands[i]}` : eqBands[i]}</span>
+                        <div style={{ height: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <input 
+                            type="range" min="-15" max="15" step="1" value={eqBands[i]} 
+                            onChange={(e) => {
+                              const newBands = [...eqBands];
+                              newBands[i] = parseFloat(e.target.value);
+                              setEqBands(newBands);
+                              setEqPreset('Custom');
+                            }}
+                            style={{ transform: 'rotate(-90deg)', width: '180px', height: '2px', accentColor: '#56CCF2', margin: 0, cursor: 'pointer' }} 
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  </div>
+              </div>
+            )}  
 
           {/* GLOBAL TOAST (UPLOADS & QUEUE) */}
           {(isUploading || toastMessage) && (

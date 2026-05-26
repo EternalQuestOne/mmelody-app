@@ -190,9 +190,9 @@ body {
 
 /* COMPRESSED ALBUM ART */
 .detail-art-container { 
-  width: 100%; 
-  max-width: 330px; /* Restricts size on standard mobile screens to save vertical space */
-  margin: 0 auto 20px auto; /* Reduced margin */
+  width: 95%; /* Reduces the overall size of the art */
+  max-width: 350px; 
+  margin: 0 auto 10px auto; /* margin 0 auto guarantees absolute centering */
   aspect-ratio: 1 / 1; 
   box-shadow: 0 10px 40px rgba(0,0,0,0.5); 
   border-radius: 12px; 
@@ -286,32 +286,52 @@ body {
 }
 
 .master-play-pause-btn { 
-  width: 45px; 
-  height: 45px; 
-  background-color: #ffffff; /* Solid white circle */
-  color: #2F80ED; /* Deeper blue icon for great contrast against white */
-  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15); /* Soft, subtle white glow */
+  background-color: transparent; 
+  color: #56CCF2; /* Standard theme blue */
+  box-shadow: none; 
 }
 .master-play-pause-btn:hover { 
-  background-color: #e6e6e6; /* Slightly darker grey-white on hover */
+  color: #8ce0fa; /* Slightly brighter blue on hover */
   transform: scale(1.05); 
 }
 
 .master-stop-btn { 
-  width: 45px; 
-  height: 45px; 
-  background-color: #ffffff; /* Solid white circle */
-  color: #E0245E; /* Vibrant red icon */
-  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15); /* Soft, subtle white glow */
+  background-color: transparent; 
+  color: #ff4d4d; /* Standard theme red */
+  box-shadow: none; 
 }
 .master-stop-btn:hover { 
-  background-color: #e6e6e6; /* Slightly darker grey-white on hover */
+  color: #ff8080; /* Slightly brighter red on hover */
   transform: scale(1.05); 
 }
 
-.more-details-wrapper { margin-top: 5px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px; }
-.more-details-btn { width: 100%; background-color: transparent; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 12px; border-radius: 20px; font-size: 1rem; cursor: pointer; transition: background-color 0.2s; }
-.more-details-btn:hover { background-color: rgba(255,255,255,0.05); }
+.more-details-wrapper { 
+  margin-top: 5px; 
+  border-top: none; /* Removed the line to keep it cleaner */
+  padding-top: 10px; 
+  text-align: center; /* CRITICAL: Centers the button in the middle of the screen */
+}
+
+.more-details-btn { 
+  width: fit-content !important; /* CRITICAL: Shrinks the button wrapper to exactly fit the text */
+  margin: 0 auto; 
+  background: linear-gradient(145deg, #2F80ED, #56CCF2) !important; 
+  border: none !important; 
+  color: #fff; 
+  padding: 8px 24px !important; /* Tightens the padding around the text */
+  border-radius: 25px; 
+  font-size: 0.75rem !important; 
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  box-shadow: 0 4px 10px rgba(47, 128, 237, 0.3);
+  cursor: pointer; 
+  transition: transform 0.2s; 
+}
+
+.more-details-btn:hover { 
+  transform: scale(1.05); 
+}
 .more-details-content { margin-top: 20px; animation: fadeIn 0.3s ease; }
 .tag-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
 .tag-item { 
@@ -330,9 +350,9 @@ body {
   text-transform: uppercase; /* Optional: Makes it look even cleaner, like a native app label */
   letter-spacing: 0.5px; /* Gives the bold letters a tiny bit of breathing room */
 }
-.lyrics-box { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; }
-.lyrics-box h4 { margin: 0 0 10px 0; color: #56CCF2; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; } 
-.lyrics-box p { white-space: pre-wrap; color: #ddd; line-height: 1.6; font-size: 0.8rem; margin: 0; }
+.lyrics-box { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; text-align: center; }
+.lyrics-box h4 { margin: 0 0 10px 0; color: #56CCF2; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;; text-align: center; } 
+.lyrics-box p { white-space: pre-wrap; color: #ddd; line-height: 1.6; font-size: 0.8rem; margin: 0 auto; text-align: center; }
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -721,4 +741,39 @@ body {
 
 .modal-search-input:focus {
   border-color: #56CCF2;
+}
+/* --- SHIFT ALBUM ART UPWARDS --- */
+.detail-view-container {
+  padding-top: 5px !important; /* Reduces the master gap at the top of the screen */
+}
+
+.back-btn {
+  padding-bottom: 5px !important; /* Removes extra space underneath the arrow */
+}
+
+.detail-art-container {
+  width: 80% !important; 
+  max-width: 300px !important;
+  margin: 30 auto 10px auto !important; /* Top margin is 0 */
+  display: block !important; /* CRITICAL: Kills the 'grid' centering from App.jsx */
+}
+
+.detail-art {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  object-position: top center !important; /* CRITICAL: Anchors the image to the top edge */
+}
+
+/* --- HIDE SCROLLBARS FOR A NATIVE APP FEEL --- */
+
+/* For Chrome, Safari, and Opera (and mobile WebViews) */
+.detail-view-container::-webkit-scrollbar {
+  display: none;
+}
+
+/* For IE, Edge, and Firefox */
+.detail-view-container {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }

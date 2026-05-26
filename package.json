@@ -13,6 +13,7 @@
     "@capacitor/android": "^8.3.0",
     "@capacitor/core": "^8.3.0",
     "@capgo/capacitor-media-session": "^8.0.17",
+    "@supabase/auth-helpers-react": "^0.15.0",
     "@supabase/supabase-js": "^2.100.0",
     "jsmediatags": "^3.9.7",
     "react": "^19.2.4",
