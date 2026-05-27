@@ -1,4 +1,3 @@
-import { useUser } from './hooks/useUser';
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabaseClient'
 import jsmediatags from 'jsmediatags/dist/jsmediatags.min.js'
@@ -33,7 +32,6 @@ const extractPublicId = (url) => {
 
 
 function App() {
-  const { user } = useUser();
   const [credentials, setCredentials] = useState({
     supabaseUrl: localStorage.getItem('supabaseUrl') || '',
     supabaseAnonKey: localStorage.getItem('supabaseAnonKey') || '',
@@ -1004,10 +1002,7 @@ function App() {
                     audio_url: audioUrl,
                     cover_url: coverUrl,
                     is_favorite: false,
-                    user_id: user?.id || null, // This safely captures the ID
                     created_at: new Date().toISOString()
-                    // ADD THIS LINE BELOW:
-                    
                   };
 
                   // 5. The Absolute Final Check
