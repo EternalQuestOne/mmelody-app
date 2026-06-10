@@ -1,31 +1,48 @@
 @import url('https://fonts.googleapis.com/css2?family=Kaushan+Script&display=swap');
-/* --- Core Styling --- */
-html {
-  background-color: #000000; /* CRITICAL: This alone fixes the white gap! */
-}
-
-body {
+/* --- Core Styling & Anti-Bounce Locks --- */
+html, body {
   background-color: #000000;
   color: #ffffff;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   margin: 0;
   padding: 0;
-  /* We removed the aggressive scroll-locking rules from here */
+  
+  /* ABSOLUTE PIN: Nails the document strictly to the physical screen coordinates */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh; /* Fallback */
+  height: var(--app-height, 100vh); /* Locks to the exact JS measured pixels */
+  
+  /* CRITICAL LOCKS: Stops the native WebView from bouncing */
+  overflow: hidden; 
+  overscroll-behavior: none;
 }
 
 #root {
   width: 100%;
+  height: 100%;
   display: flex;
   justify-content: center;
 }
 
 .app-root { 
-  width: 100%; 
+  position: fixed; 
+  inset: 0; 
+  width: 100%;
+  height: 100vh; /* Fallback */
+  height: var(--app-height); /* CRITICAL FIX: Uses the exact pixel lock injected by JS */ 
   display: flex; 
   flex-direction: column;
-  justify-content: flex-start; 
   align-items: center;
-  min-height: 100vh;
+  
+  /* MOVED SCROLLING HERE: The app body is locked, but the content inside can scroll */
+  overflow-y: auto; 
+  overflow-x: hidden;
+  overscroll-behavior-y: contain; /* Traps the scroll inside the app, preventing it from passing to the system */
 }
 
 .main-content-area {
@@ -754,7 +771,7 @@ body {
 .detail-art-container {
   width: 80% !important; 
   max-width: 300px !important;
-  margin: 30 auto 10px auto !important; /* Top margin is 0 */
+  margin: 30px auto 10px auto !important; /* CLEANUP: Added missing 'px' to 30 to fix centering */
   display: block !important; /* CRITICAL: Kills the 'grid' centering from App.jsx */
 }
 
@@ -776,4 +793,65 @@ body {
 .detail-view-container {
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
+}
+
+/* --- ABOUT MODAL --- */
+.about-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px); 
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999; 
+}
+
+.about-modal-content {
+  background-color: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 30px;
+  width: 240px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.about-logo {
+  width: 80px;
+  height: 80px;
+  border-radius: 18px; 
+  object-fit: cover;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.close-about-btn {
+  background-color: #56CCF2; 
+  color: #000;
+  border: none;
+  border-radius: 20px;
+  padding: 10px 30px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.close-about-btn:active {
+  opacity: 0.7;
+}
+
+@keyframes popIn {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }

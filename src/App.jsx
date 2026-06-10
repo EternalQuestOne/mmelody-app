@@ -8,15 +8,28 @@ import { MediaSession } from '@capgo/capacitor-media-session';
 import Visualizer from './Visualizer';
 
 const extractTagText = (frame) => {
-  if (!frame) return '';
-  if (typeof frame === 'string') return frame;
-  if (frame.data) {
-    if (typeof frame.data === 'string') return frame.data;
-    if (typeof frame.data.text === 'string') return frame.data.text;
-    if (typeof frame.data.lyrics === 'string') return frame.data.lyrics;
-    if (typeof frame.data.description === 'string') return frame.data.description;
-  }
-  return '';
+    if (!frame) return '';
+    
+    // 1. If it's a simple string, return it
+    if (typeof frame === 'string') return frame;
+    
+    // 2. If it's an object, check common properties where libraries hide the text
+    if (typeof frame === 'object') {
+        // Direct text property
+        if (frame.text) return typeof frame.text === 'string' ? frame.text : extractTagText(frame.text);
+        // The 'data' object is where jsmediatags usually stores the content
+        if (frame.data) {
+            if (typeof frame.data === 'string') return frame.data;
+            if (frame.data.text) return frame.data.text;
+            if (frame.data.data) return frame.data.data; // This is often where lyrics hide!
+            if (frame.data.lyrics) return frame.data.lyrics;
+        }
+        // Handle array of frames
+        if (Array.isArray(frame)) {
+            return frame.map(f => extractTagText(f)).join('\n');
+        }
+    }
+    return '';
 }
 
 const extractPublicId = (url) => {
@@ -44,7 +57,10 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('')
   const [playlistSearchTerm, setPlaylistSearchTerm] = useState('') 
   const [playlistDetailSortOrders, setPlaylistDetailSortOrders] = useState({})
-
+  // Modal states
+  // Modal states
+  const [showAbout, setShowAbout] = useState(false);
+  const appVersion = "0.08d"; // Update this whenever you build a new APK
   const [currentSong, setCurrentSong] = useState(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const EQ_PRESETS = {
@@ -161,6 +177,23 @@ function App() {
   const moreDetailsRef = useRef(null)
 
   useEffect(() => {
+    // 1. CRITICAL PIXEL LOCK: Measures exact screen size to ignore system resizing
+    const setAppHeight = () => document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
+    setAppHeight();
+    window.addEventListener('resize', setAppHeight); 
+
+    // 2. NUCLEAR TOUCH LOCK: Kills the native Android WebView bounce completely
+    const stopDragBounce = (e) => {
+        // If the finger/drag is NOT explicitly inside a scrolling container, destroy the event
+        const isScrollable = e.target.closest('.detail-view-container, .song-list, .playlist-options, .playlists-list-view, .tag-grid');
+        if (!isScrollable) {
+            e.preventDefault();
+        }
+    };
+    
+    // { passive: false } is strictly required for preventDefault() to work on touch moves
+    document.body.addEventListener('touchmove', stopDragBounce, { passive: false });
+
     window.history.replaceState({ tab: 'list' }, '', '');
     const handleHardwareBack = (event) => {
       if (event.state && event.state.tab) {
@@ -173,68 +206,106 @@ function App() {
     return () => window.removeEventListener('popstate', handleHardwareBack);
   }, []);
 
-  // The Ultimate Android 12 + 15 Lock Screen Sync
+  // The Ultimate Android 12 + 15 Lock Screen Sync (Crash-Proof)
   useEffect(() => {
     const syncProfessionalLockScreen = async () => {
       if (!currentSong) return;
 
-      // 1. Prepare the artwork (Force JPG for Android compatibility)
       const optimizedArt = currentSong.cover_url 
         ? currentSong.cover_url.replace('/upload/', '/upload/w_500,h_500,c_fill,f_jpg/') 
         : 'https://images.unsplash.com/photo-1614680376593-902f74a77789?w=500&h=500&fit=crop';
 
       try {
-        // STEP 1: Build the Lock Screen Data
-        await MediaSession.setMetadata({
-          title: currentSong.title || 'Unknown Title',
-          artist: currentSong.artist || 'Unknown Artist',
-          album: currentSong.album || 'mMelody',
-          artwork: [{ src: optimizedArt, sizes: '512x512', type: 'image/jpeg' }]
-        });
+        // SAFE CHECK: Only attempt MediaSession if the library exists and is loaded
+        if (typeof MediaSession !== 'undefined') {
+            await MediaSession.setMetadata({
+              title: currentSong.title || 'Unknown Title',
+              artist: currentSong.artist || 'Unknown Artist',
+              album: currentSong.album || 'mMelody',
+              artwork: [{ src: optimizedArt, sizes: '512x512', type: 'image/jpeg' }]
+            });
 
-        // STEP 2: Explicitly declare Play/Pause State IMMEDIATELY after Metadata
-        await MediaSession.setPlaybackState({ 
-          playbackState: isPlaying ? 'playing' : 'paused' 
-        });
+            await MediaSession.setPlaybackState({ playbackState: isPlaying ? 'playing' : 'paused' });
 
-        // STEP 3: Attach the Button Handlers and force immediate UI updates
-        await MediaSession.setActionHandler({ action: 'play' }, async () => {
-          if (audioRef.current) { 
-            audioRef.current.play().catch(e => console.log("Play blocked:", e)); 
-            setIsPlaying(true); 
-            await MediaSession.setPlaybackState({ playbackState: 'playing' });
-          }
-        });
+            await MediaSession.setActionHandler({ action: 'play' }, async () => {
+              if (audioRef.current) { 
+                audioRef.current.play().catch(e => console.log("Play blocked", e)); 
+                setIsPlaying(true);
+                await MediaSession.setPlaybackState({ playbackState: 'playing' });
+              }
+            });
 
-        await MediaSession.setActionHandler({ action: 'pause' }, async () => {
-          if (audioRef.current) { 
-            audioRef.current.pause(); 
-            setIsPlaying(false); 
-            await MediaSession.setPlaybackState({ playbackState: 'paused' });
-          }
-        });
+            await MediaSession.setActionHandler({ action: 'pause' }, async () => {
+              if (audioRef.current) { 
+                audioRef.current.pause(); 
+                setIsPlaying(false); 
+                await MediaSession.setPlaybackState({ playbackState: 'paused' });
+              }
+            });
 
-        await MediaSession.setActionHandler({ action: 'previoustrack' }, () => handlePreviousSong());
-        await MediaSession.setActionHandler({ action: 'nexttrack' }, () => handleNextSong());
-        
+            await MediaSession.setActionHandler({ action: 'previoustrack' }, () => handlePreviousSong());
+            await MediaSession.setActionHandler({ action: 'nexttrack' }, () => handleNextSong());
+        }
       } catch (err) {
-        console.log("Media Session error:", err);
+        // Silently fail rather than crashing the appnpx cap sync
+        console.warn("Media Session initialization skipped or failed:", err);
       }
     };
 
     syncProfessionalLockScreen();
 
-    // STEP 4: Kill the hidden Web Browser's player so it stops stealing button clicks
+    // 3. Empower Chrome's Native Media Handler to catch magnetic hardware signals
     if ('mediaSession' in navigator) {
-      navigator.mediaSession.metadata = null;
-      navigator.mediaSession.playbackState = 'none';
-      navigator.mediaSession.setActionHandler('play', null);
-      navigator.mediaSession.setActionHandler('pause', null);
-      navigator.mediaSession.setActionHandler('previoustrack', null);
-      navigator.mediaSession.setActionHandler('nexttrack', null);
+      try {
+        navigator.mediaSession.setActionHandler('play', () => {
+          if (audioRef.current) { audioRef.current.play(); setIsPlaying(true); }
+        });
+        navigator.mediaSession.setActionHandler('pause', () => {
+          if (audioRef.current) { audioRef.current.pause(); setIsPlaying(false); }
+        });
+      } catch(e) { console.warn("Browser mediaSession reset failed", e); }
     }
+  }, [currentSong]);
 
-  }, [currentSong, isPlaying, queueContext, playlistSongs, songs, isShuffle, userQueue]);
+  // NATIVE BRIDGE LISTENER: Catches the custom signal from MainActivity.java
+  useEffect(() => {
+    const handleMagneticDisconnect = () => {
+      if (audioRef.current && !audioRef.current.paused) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      }
+    };
+
+    const handleMagneticConnect = () => {
+      if (audioRef.current && audioRef.current.paused && currentSong) {
+        audioRef.current.play().catch(e => console.log("Auto-resume blocked", e));
+        setIsPlaying(true);
+      }
+    };
+
+    // Define the forcePlay function so the Java Bridge can trigger it
+    window.forcePlay = () => {
+      if (audioRef.current && audioRef.current.paused && currentSong) {
+        audioRef.current.play().catch(e => {
+            console.error("Auto-resume blocked by browser policy:", e);
+            // Fallback: If policy blocks it, try to re-init session
+            if (typeof MediaSession !== 'undefined') {
+                MediaSession.setPlaybackState({ playbackState: 'playing' });
+            }
+        });
+        setIsPlaying(true);
+      }
+    };
+
+    window.addEventListener('magnetic-disconnect', handleMagneticDisconnect);
+    window.addEventListener('magnetic-connect', handleMagneticConnect);
+    
+    return () => {
+      window.forcePlay = null; // Clean up the global function
+      window.removeEventListener('magnetic-disconnect', handleMagneticDisconnect);
+      window.removeEventListener('magnetic-connect', handleMagneticConnect);
+    }
+  }, [currentSong]); // Added currentSong dependency so it doesn't play if queue is empty
 
   const navigateTo = (newTab) => {
     if (activeTab === newTab) return;
@@ -687,6 +758,7 @@ function App() {
       }
 
       if (!cancelUploadRef.current) {
+        await getSongs();
          showToast(`Deleted ${successfullyDeletedIds.length} songs successfully.`);
       }
     } catch (err) { console.error("Deletion Error:", err); }
@@ -924,6 +996,9 @@ function App() {
   const handleFileUpload = async (event) => {
     const files = Array.from(event.target.files);
     if (files.length === 0) return;
+    console.log("🎵 Upload started! Files:", files.length);
+    console.log("🔗 Supabase client:", supabase ? "Connected" : "NOT CONNECTED");
+    console.log("📁 First file:", files[0]?.name);
     
     setIsUploading(true);
     setShowStopButton(true);
@@ -933,98 +1008,157 @@ function App() {
     let processedCount = 0;
     let i = 0;
 
-    // Use a while loop so we have absolute control over the iteration
     while (i < files.length) {
-      // 1. The Ultimate Guard: Check before starting ANY new batch
       if (cancelUploadRef.current) {
         showToast(`Upload stopped. Saved ${processedCount} of ${files.length}.`);
         break; 
       }
 
       const chunk = files.slice(i, i + BATCH_SIZE);
+      setUploadProgressText(`Reading tags for ${i + 1}-${Math.min(i + BATCH_SIZE, files.length)}...`);
+
+      // FIX PART 1: Read metadata SEQUENTIALLY with isolated buffers to prevent FileReader dropouts
+      for (const file of chunk) {
+        if (cancelUploadRef.current) break;
+        
+        let isolatedBlob;
+        try {
+            // CRITICAL FIX: Isolating the file into an ArrayBuffer prevents the browser from dropping the read operation!
+            const buffer = await file.arrayBuffer();
+            isolatedBlob = new Blob([buffer], { type: file.type || 'audio/mpeg' });
+            isolatedBlob.name = file.name;
+        } catch (e) {
+            isolatedBlob = file; // Fallback to raw file if buffer fails
+        }
+
+        file.extractedTags = await new Promise((resolve) => {
+          let resolved = false;
+          const timeout = setTimeout(() => {
+            if (!resolved) {
+              console.warn("Metadata read timeout for: " + file.name);
+              resolved = true;
+              resolve(null);
+            }
+          }, 10000); // 10 second timeout
+
+          jsmediatags.read(isolatedBlob, {
+            onSuccess: (tag) => {
+              if (!resolved) {
+                clearTimeout(timeout);
+                resolved = true;
+                console.log("✓ Metadata read successful for: " + file.name);
+                resolve(tag.tags);
+              }
+            },
+            onError: (err) => {
+              if (!resolved) {
+                clearTimeout(timeout);
+                resolved = true;
+                console.error("✗ Metadata read failed for: " + file.name, err);
+                resolve(null);
+              }
+            }
+          });
+        });
+      }
+
       setUploadProgressText(`Uploading ${i + 1}-${Math.min(i + BATCH_SIZE, files.length)} of ${files.length}...`);
 
-      // We still process in parallel for speed, but wrap it tightly
+      // FIX PART 2: Proceed with Cloudinary & Supabase uploads CONCURRENTLY for speed
       await Promise.all(chunk.map(async (file) => {
-        // 2. The Mid-Flight Guard: Check before even creating the audio element
         if (cancelUploadRef.current) return;
 
-        return new Promise((resolve) => {
-          const objectURL = URL.createObjectURL(file);
-          const tempAudio = new Audio(objectURL);
+        try {
+          const tags = file.extractedTags || {}; 
 
-          tempAudio.addEventListener('loadedmetadata', () => {
-            const mins = Math.floor(tempAudio.duration / 60);
-            const secs = Math.floor(tempAudio.duration % 60).toString().padStart(2, '0');
-            const durationStr = `${mins}:${secs}`;
-            URL.revokeObjectURL(objectURL);
+          // 2. Prepare Cover Image
+          let coverUrl = '';
+          if (tags.picture) {
+            const byteArray = new Uint8Array(tags.picture.data);
+            const blob = new Blob([byteArray], { type: tags.picture.format });
+            const imgFormData = new FormData();
+            imgFormData.append('file', blob);
+            imgFormData.append('upload_preset', 'mMelody_preset');
+            
+            const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${credentials.cloudinaryName}/image/upload`, { method: 'POST', body: imgFormData });
+            const imgData = await imgRes.json();
+            coverUrl = imgData.secure_url;
+          }
 
-            jsmediatags.read(file, {
-              onSuccess: async function(tag) {
-                try {
-                  // 3. The Pre-Network Guard: Check before expensive Cloudinary fetch
-                  if (cancelUploadRef.current) { resolve(); return; }
-
-                  const tags = tag.tags;
-                  let coverUrl = '';
-
-                  if (tags.picture) {
-                    const byteArray = new Uint8Array(tags.picture.data);
-                    const blob = new Blob([byteArray], { type: tags.picture.format });
-                    const imgFormData = new FormData();
-                    imgFormData.append('file', blob);
-                    imgFormData.append('upload_preset', 'mMelody_preset');
-                    const imgRes = await fetch(`https://api.cloudinary.com/v1_1/${credentials.cloudinaryName}/image/upload`, { method: 'POST', body: imgFormData });
-                    coverUrl = (await imgRes.json()).secure_url;
-                  }
-                  
-                  // 4. The Post-Network Guard: Check before database insertion
-                  if (cancelUploadRef.current) { resolve(); return; }
-
-                  const audioFormData = new FormData();
-                  audioFormData.append('file', file);
-                  audioFormData.append('upload_preset', 'mMelody_preset');
-                  const audioRes = await fetch(`https://api.cloudinary.com/v1_1/${credentials.cloudinaryName}/video/upload`, { method: 'POST', body: audioFormData });
-                  const audioUrl = (await audioRes.json()).secure_url;
-
-                  const newSong = {
-                    title: tags.title || file.name.replace('.mp3', ''),
-                    subtitle: extractTagText(tags.TIT3) || '',
-                    artist: tags.artist || '',
-                    album: tags.album || '',
-                    genre: tags.genre || '',
-                    release_year: tags.year || '',
-                    duration: durationStr,
-                    comment: extractTagText(tags.COMM) || '',
-                    composer: extractTagText(tags.TCOM) || '', 
-                    lyricist: extractTagText(tags.TEXT) || extractTagText(tags.TOLY) || '',
-                    lyrics: extractTagText(tags.USLT) || extractTagText(tags.SYLT) || '', 
-                    audio_url: audioUrl,
-                    cover_url: coverUrl,
-                    is_favorite: false,
-                    created_at: new Date().toISOString()
-                  };
-
-                  // 5. The Absolute Final Check
-                  if (!cancelUploadRef.current) {
-                    const { data } = await supabase.from('songs').insert([newSong]).select();
-                    if (data) {
-                      setSongs(prev => [data[0], ...prev]);
-                      processedCount++;
-                    }
-                  }
-                } catch (err) { console.error("Upload error:", err); } 
-                finally { resolve(); }
-              },
-              onError: function() { resolve(); }
-            });
-          });
+          // 3. Upload Audio
+          const audioFormData = new FormData();
+          audioFormData.append('file', file);
+          audioFormData.append('upload_preset', 'mMelody_preset');
           
-          tempAudio.addEventListener('error', () => resolve());
-        });
+          const audioRes = await fetch(`https://api.cloudinary.com/v1_1/${credentials.cloudinaryName}/video/upload`, { method: 'POST', body: audioFormData });
+          const audioData = await audioRes.json();
+          const audioUrl = audioData.secure_url;
+
+          // 4. Construct Song Object with Robust Lyrics Extraction
+          let lyrics = '';
+          if (tags.USLT) lyrics = extractTagText(tags.USLT);
+          if (!lyrics && tags.ULT) lyrics = extractTagText(tags.ULT); // ID3v2.2 fallback added
+          if (!lyrics && tags.SYLT) lyrics = extractTagText(tags.SYLT);
+          if (!lyrics && tags.LYRICS) lyrics = extractTagText(tags.LYRICS);
+          if (!lyrics && tags.LYRC) lyrics = extractTagText(tags.LYRC);
+
+          if (!lyrics && tags.TXXX) {
+              const txxxArray = Array.isArray(tags.TXXX) ? tags.TXXX : [tags.TXXX];
+              for (const txxx of txxxArray) {
+                  const txxxText = extractTagText(txxx);
+                  if (txxxText && txxxText.length > 100 && !txxxText.toLowerCase().includes('user defined')) {
+                      lyrics = txxxText;
+                      console.log("✅ Lyrics found in TXXX frame for: " + file.name);
+                      break;
+                  }
+              }
+          }
+
+          if (!lyrics && tags.COMM) {
+              const commText = extractTagText(tags.COMM);
+              if (commText.length > 100 && !commText.toLowerCase().includes('copyright') && !commText.toLowerCase().includes('sankar')) {
+                  lyrics = commText;
+                  console.log("✅ Lyrics found in COMM frame for: " + file.name);
+              }
+          }
+
+          console.log(`Processing ${tags.title || file.name}. Lyrics found: ${lyrics.length > 0 ? 'Yes' : 'No'}`);
+
+          const newSong = {
+              title: tags.title || file.name.replace('.mp3', ''),
+              subtitle: extractTagText(tags.TIT3) || '',
+              artist: tags.artist || 'Unknown Artist',
+              album: tags.album || '',
+              genre: tags.genre || '',
+              release_year: tags.year || '',
+              duration: '0:00',
+              comment: extractTagText(tags.COMM) || '',
+              composer: extractTagText(tags.TCOM) || '',
+              lyricist: extractTagText(tags.TEXT) || extractTagText(tags.TOLY) || '',
+              lyrics: lyrics,
+              audio_url: audioUrl,
+              cover_url: coverUrl,
+              is_favorite: false,
+              created_at: new Date().toISOString()
+          };
+
+          // 5. Final Insertion
+          if (!cancelUploadRef.current) {
+            const { data, error } = await supabase.from('songs').insert([newSong]).select();
+            if (error) throw error;
+            if (data) {
+              setSongs(prev => {
+                  if (prev.find(s => s.id === data[0].id)) return prev;
+                  return [data[0], ...prev];
+              });
+              processedCount++;
+            }
+          }
+        } catch (err) {
+          console.error("Batch upload failed for file:", file.name, err);
+        }
       }));
 
-      // Only advance the loop index after the chunk has fully resolved
       i += BATCH_SIZE;
     }
 
@@ -1033,9 +1167,10 @@ function App() {
     setUploadProgressText('');
     
     if (!cancelUploadRef.current) {
+       await getSongs();
        showToast(`${processedCount} songs processed successfully!`);
     }
-    
+        
     cancelUploadRef.current = false; 
     if (fileInputRef.current) fileInputRef.current.value = null; 
   }
@@ -1196,6 +1331,14 @@ function App() {
             autoPlay={isPlaying}
             onEnded={handleNextSong} 
             onTimeUpdate={handleTimeUpdate}
+            onPlay={() => {
+              setIsPlaying(true);
+              if (typeof MediaSession !== 'undefined') MediaSession.setPlaybackState({ playbackState: 'playing' }).catch(()=>{});
+            }}
+            onPause={() => {
+              setIsPlaying(false);
+              if (typeof MediaSession !== 'undefined') MediaSession.setPlaybackState({ playbackState: 'paused' }).catch(()=>{});
+            }}
             crossOrigin="anonymous"
           />
           {activeMenu && (
@@ -1210,7 +1353,7 @@ function App() {
                   display: 'flex', 
                   flexDirection: 'column', 
                   justifyContent: 'flex-start', 
-                  height: 'calc(100vh - 65px)', /* Keeps the scrollable area perfectly bounded above the bottom nav */
+                  height: 'calc(var(--app-height, 100vh) - 65px)', /* CLEANUP: Replaced 100vh with locked variable to stop volume bar jumping on this tab */
                   overflowY: 'auto', /* CRITICAL FIX: 'auto' prevents the container from EVER slicing the bottom UI */
                   overflowX: 'hidden',
                   padding: '20px 20px 40px 20px', /* Generous bottom padding so the button clears the absolute edge */
@@ -2282,8 +2425,8 @@ function App() {
                         </button>
                       )}
 
-                      {/* DELETE PRESET BUTTON: Only shows for user-saved custom presets */}
-                      {Object.keys(customPresets).includes(eqPreset) && (
+                  {/* DELETE PRESET BUTTON: Only shows for user-saved custom presets */}
+                  {Object.keys(customPresets).includes(eqPreset) && (
                         <button onClick={() => {
                           if(window.confirm(`Delete the "${eqPreset}" preset?`)) {
                             const updatedPresets = { ...customPresets };
@@ -2434,6 +2577,15 @@ function App() {
                     <span>Settings</span>
                   </div>
 
+                  <div className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 15px' }} onClick={(e) => { e.stopPropagation(); setActiveMenu(null); setShowAbout(true); }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#56CCF2" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="16" x2="12" y2="12"></line>
+                      <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                    <span style={{ color: '#fff' }}>About App</span>
+                  </div>
+
                   <div className="dropdown-item" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 15px' }} onClick={(e) => { e.stopPropagation(); setActiveMenu(null); handleExitApp(); }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff4d4d" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
@@ -2445,6 +2597,22 @@ function App() {
                 </div>
               )}
             </div>
+
+            {/* ABOUT MODAL */}
+            {showAbout && (
+              <div className="about-modal-overlay" onClick={() => setShowAbout(false)}>
+                <div className="about-modal-content" onClick={(e) => e.stopPropagation()}>
+                  <img src={logoImage} alt="mMelody Logo" className="about-logo" />
+                  <h2 style={{ margin: '10px 0 5px 0', fontSize: '1.4rem' }}>mMelody</h2>
+                  <p style={{ margin: '0 0 20px 0', color: '#888', fontSize: '0.9rem' }}>
+                    Version {appVersion}
+                  </p>
+                  <button className="close-about-btn" onClick={() => setShowAbout(false)}>
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
 
           </nav>
         </>
